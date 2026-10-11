@@ -1,8 +1,8 @@
 use gpui::{Context, Div, IntoElement, Render, Task, Window, div, prelude::*, rgb};
 
 use crate::{
-    dynamodb::{self, Connection, ReadMode},
-    ui::{self, ACCENT, BACKGROUND, BORDER, MUTED, PANEL, TEXT},
+    dynamodb::{self, Connection, LoadError, ReadMode},
+    ui::{self, ACCENT, BACKGROUND, BORDER, ERROR, MUTED, PANEL, TEXT},
 };
 
 #[derive(Default)]
@@ -12,7 +12,7 @@ pub struct Explorer {
     tables: Vec<String>,
     selected_table: Option<String>,
     loading: bool,
-    error: Option<String>,
+    error: Option<LoadError>,
     request_id: u64,
     load_task: Option<Task<()>>,
 }
@@ -171,7 +171,18 @@ impl Explorer {
                                 |list| list.child("No tables in this connection"),
                             )
                             .when_some(self.error.as_ref(), |list, error| {
-                                list.child(div().text_color(rgb(0xffa3a3)).child(error.clone()))
+                                list.child(
+                                    div()
+                                        .flex()
+                                        .flex_col()
+                                        .gap_2()
+                                        .child(div().text_color(rgb(ERROR)).child(error.title()))
+                                        .child(
+                                            div()
+                                                .text_color(rgb(MUTED))
+                                                .child(error.message(self.connection)),
+                                        ),
+                                )
                             }),
                     ),
             )

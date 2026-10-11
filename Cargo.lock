@@ -2594,6 +2594,7 @@ name = "gpui-demo"
 version = "0.1.0"
 dependencies = [
  "aws-config",
+ "aws-credential-types",
  "aws-sdk-dynamodb",
  "gpui",
  "libc",

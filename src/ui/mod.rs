@@ -8,6 +8,7 @@ pub const BORDER: u32 = 0x2c313c;
 pub const TEXT: u32 = 0xe6e9ef;
 pub const MUTED: u32 = 0x9aa4b5;
 pub const ACCENT: u32 = 0x95b8ff;
+pub const ERROR: u32 = 0xffa3a3;
 
 pub fn choice(id: &'static str, label: &'static str, selected: bool) -> Stateful<Div> {
     div()

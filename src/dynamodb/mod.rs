@@ -1,5 +1,8 @@
 //! Read-only DynamoDB access, independent of GPUI.
 
+mod error;
+pub use error::LoadError;
+
 use std::time::Duration;
 
 use aws_config::{BehaviorVersion, meta::region::RegionProviderChain};
@@ -11,18 +14,21 @@ use aws_sdk_dynamodb::{
 const LOCAL_ENDPOINT: &str = "http://127.0.0.1:8000";
 
 /// Run on GPUI's background executor: the SDK requires a Tokio reactor.
-pub fn load_tables(connection: Connection) -> Result<Vec<String>, String> {
+pub fn load_tables(connection: Connection) -> Result<Vec<String>, LoadError> {
     load_tables_with_page_size(connection, 100)
 }
 
 fn load_tables_with_page_size(
     connection: Connection,
     page_size: i32,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<String>, LoadError> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .map_err(|error| format!("Could not start AWS runtime: {error}"))?;
+        .map_err(|error| {
+            log::warn!("Could not start AWS runtime: {error}");
+            LoadError::Unexpected
+        })?;
 
     runtime.block_on(async {
         tokio::time::timeout(Duration::from_secs(30), async {
@@ -56,8 +62,11 @@ fn load_tables_with_page_size(
                 .send();
             while let Some(page) = pages.next().await {
                 let page = page.map_err(|error| {
-                    // DisplayErrorContext includes the underlying HTTP/service error.
-                    format!("{}", aws_sdk_dynamodb::error::DisplayErrorContext(&error))
+                    log::warn!(
+                        "DynamoDB table discovery failed: {}",
+                        aws_sdk_dynamodb::error::DisplayErrorContext(&error)
+                    );
+                    error::classify(&error)
                 })?;
                 tables.extend(page.table_names().iter().cloned());
             }
@@ -67,7 +76,8 @@ fn load_tables_with_page_size(
         })
         .await
         .map_err(|_| {
-            "Table loading timed out after 30 seconds. Check the connection and retry.".to_owned()
+            log::warn!("DynamoDB table discovery timed out after 30 seconds");
+            LoadError::Timeout
         })?
     })
 }
