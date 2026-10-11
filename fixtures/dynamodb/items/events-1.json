@@ -1,0 +1,704 @@
+{
+  "Events": [
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:00:00Z"
+          },
+          "eventType": {
+            "S": "LOGIN"
+          },
+          "sequence": {
+            "N": "0"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:01:00Z"
+          },
+          "eventType": {
+            "S": "VIEW"
+          },
+          "sequence": {
+            "N": "1"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:02:00Z"
+          },
+          "eventType": {
+            "S": "LOGIN"
+          },
+          "sequence": {
+            "N": "2"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:03:00Z"
+          },
+          "eventType": {
+            "S": "VIEW"
+          },
+          "sequence": {
+            "N": "3"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:04:00Z"
+          },
+          "eventType": {
+            "S": "LOGIN"
+          },
+          "sequence": {
+            "N": "4"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:05:00Z"
+          },
+          "eventType": {
+            "S": "VIEW"
+          },
+          "sequence": {
+            "N": "5"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:06:00Z"
+          },
+          "eventType": {
+            "S": "LOGIN"
+          },
+          "sequence": {
+            "N": "6"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:07:00Z"
+          },
+          "eventType": {
+            "S": "VIEW"
+          },
+          "sequence": {
+            "N": "7"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:08:00Z"
+          },
+          "eventType": {
+            "S": "LOGIN"
+          },
+          "sequence": {
+            "N": "8"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:09:00Z"
+          },
+          "eventType": {
+            "S": "VIEW"
+          },
+          "sequence": {
+            "N": "9"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:10:00Z"
+          },
+          "eventType": {
+            "S": "LOGIN"
+          },
+          "sequence": {
+            "N": "10"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:11:00Z"
+          },
+          "eventType": {
+            "S": "VIEW"
+          },
+          "sequence": {
+            "N": "11"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:12:00Z"
+          },
+          "eventType": {
+            "S": "LOGIN"
+          },
+          "sequence": {
+            "N": "12"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:13:00Z"
+          },
+          "eventType": {
+            "S": "VIEW"
+          },
+          "sequence": {
+            "N": "13"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:14:00Z"
+          },
+          "eventType": {
+            "S": "LOGIN"
+          },
+          "sequence": {
+            "N": "14"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:15:00Z"
+          },
+          "eventType": {
+            "S": "VIEW"
+          },
+          "sequence": {
+            "N": "15"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:16:00Z"
+          },
+          "eventType": {
+            "S": "LOGIN"
+          },
+          "sequence": {
+            "N": "16"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:17:00Z"
+          },
+          "eventType": {
+            "S": "VIEW"
+          },
+          "sequence": {
+            "N": "17"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:18:00Z"
+          },
+          "eventType": {
+            "S": "LOGIN"
+          },
+          "sequence": {
+            "N": "18"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#1"
+          },
+          "sk": {
+            "S": "2026-01-01T00:19:00Z"
+          },
+          "eventType": {
+            "S": "VIEW"
+          },
+          "sequence": {
+            "N": "19"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#2"
+          },
+          "sk": {
+            "S": "2026-01-01T00:20:00Z"
+          },
+          "eventType": {
+            "S": "LOGIN"
+          },
+          "sequence": {
+            "N": "20"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#2"
+          },
+          "sk": {
+            "S": "2026-01-01T00:21:00Z"
+          },
+          "eventType": {
+            "S": "VIEW"
+          },
+          "sequence": {
+            "N": "21"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#2"
+          },
+          "sk": {
+            "S": "2026-01-01T00:22:00Z"
+          },
+          "eventType": {
+            "S": "LOGIN"
+          },
+          "sequence": {
+            "N": "22"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#2"
+          },
+          "sk": {
+            "S": "2026-01-01T00:23:00Z"
+          },
+          "eventType": {
+            "S": "VIEW"
+          },
+          "sequence": {
+            "N": "23"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "pk": {
+            "S": "USER#2"
+          },
+          "sk": {
+            "S": "2026-01-01T00:24:00Z"
+          },
+          "eventType": {
+            "S": "LOGIN"
+          },
+          "sequence": {
+            "N": "24"
+          },
+          "metadata": {
+            "M": {
+              "source": {
+                "S": "local-fixture"
+              },
+              "success": {
+                "BOOL": true
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+[package]
+name = "gpui-demo"
+version = "0.1.0"
+edition = "2024"
+description = "A read-only DynamoDB explorer built with GPUI"
+publish = false
+
+[dependencies]
+gpui = { version = "=0.2.2", default-features = false, features = ["wayland"] }
+# GPUI's transitive xattr 0.2.3 dependency needs the ENOATTR alias removed in 0.2.190.
+libc = "=0.2.189"

@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+ddb="$project_dir/scripts/ddb"
+
+# Compose startup does not imply that DynamoDB is ready to accept requests.
+ready=false
+for ((attempt = 0; attempt < 30; attempt++)); do
+  if "$ddb" list-tables >/dev/null 2>&1; then
+    ready=true
+    break
+  fi
+  sleep 1
+done
+if [[ "$ready" != true ]]; then
+  echo "DynamoDB Local is unavailable. Start it with docker compose up -d." >&2
+  "$ddb" list-tables
+  exit 1
+fi
+
+for definition in "$project_dir"/fixtures/dynamodb/tables/*.json; do
+  table="$(basename -- "$definition" .json)"
+  exists="$("$ddb" list-tables --query "contains(TableNames, '$table')" --output text)"
+  if [[ "$exists" == False ]]; then
+    echo "Creating $table"
+    "$ddb" create-table --cli-input-json "file://$definition" >/dev/null
+  fi
+  "$ddb" wait table-exists --table-name "$table"
+done
+
+for fixture in "$project_dir"/fixtures/dynamodb/items/*.json; do
+  echo "Loading $(basename -- "$fixture")"
+  pending="$("$ddb" batch-write-item --request-items "file://$fixture" --query UnprocessedItems --output json)"
+  # Batch writes can succeed while leaving individual requests unprocessed.
+  for ((attempt = 0; attempt < 5; attempt++)); do
+    # AWS CLI can render an empty selected object as either '{}' or no output.
+    if [[ -z "$pending" || "$pending" == '{}' ]]; then
+      break
+    fi
+    sleep "$((attempt + 1))"
+    pending="$("$ddb" batch-write-item --request-items "$pending" --query UnprocessedItems --output json)"
+  done
+  if [[ -n "$pending" && "$pending" != '{}' ]]; then
+    echo "Some fixture writes remained unprocessed: $pending" >&2
+    exit 1
+  fi
+done
+
+echo "Local fixtures loaded."
+"$ddb" list-tables

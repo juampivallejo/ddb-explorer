@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Always target the local database, using credentials unrelated to AWS accounts.
+export AWS_ACCESS_KEY_ID=local
+export AWS_SECRET_ACCESS_KEY=local
+export AWS_SESSION_TOKEN=""
+export AWS_DEFAULT_REGION=us-east-1
+export AWS_PAGER=""
+export AWS_EC2_METADATA_DISABLED=true
+export AWS_MAX_ATTEMPTS=2
+
+exec aws dynamodb "$@" --endpoint-url http://127.0.0.1:8000 --region us-east-1 \
+  --cli-connect-timeout 2 --cli-read-timeout 5

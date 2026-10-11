@@ -1,0 +1,87 @@
+{
+  "Books": [
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {
+            "S": "book-1"
+          },
+          "title": {
+            "S": "Learning GPUI"
+          },
+          "price": {
+            "N": "29.99"
+          },
+          "available": {
+            "BOOL": true
+          },
+          "tags": {
+            "SS": [
+              "rust",
+              "ui"
+            ]
+          },
+          "details": {
+            "M": {
+              "pages": {
+                "N": "240"
+              },
+              "authors": {
+                "L": [
+                  {
+                    "S": "Alex"
+                  },
+                  {
+                    "S": "Sam"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {
+            "S": "book-2"
+          },
+          "title": {
+            "S": "DynamoDB Basics"
+          },
+          "price": {
+            "N": "19.50"
+          },
+          "available": {
+            "BOOL": false
+          },
+          "notes": {
+            "NULL": true
+          }
+        }
+      }
+    },
+    {
+      "PutRequest": {
+        "Item": {
+          "id": {
+            "S": "book-3"
+          },
+          "title": {
+            "S": "\u30c7\u30fc\u30bf\u3068 Rust"
+          },
+          "ratings": {
+            "NS": [
+              "4",
+              "5"
+            ]
+          },
+          "preview": {
+            "B": "SGVsbG8="
+          }
+        }
+      }
+    }
+  ]
+}
