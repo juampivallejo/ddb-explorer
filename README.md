@@ -2,8 +2,8 @@
 
 A DynamoDB explorer in progress, built with Rust and
 [GPUI](https://docs.rs/gpui/0.2.2/gpui/) for Linux with Wayland.
-The app currently has connection and read-mode selectors, a table sidebar, and
-an empty item workspace. DynamoDB access is not wired up yet.
+The app loads tables from local DynamoDB or your terminal's AWS session.
+Select a table in the sidebar; item browsing is not available yet.
 
 ## Build and run
 
@@ -44,5 +44,4 @@ cargo clippy --all-targets -- -D warnings
 ```
 
 `src/main.rs` starts the app, `src/app.rs` holds the explorer view and state,
-`src/ui/` contains shared components, and `src/dynamodb/` defines connection
-and read-operation choices.
+`src/ui/` contains shared components, and `src/dynamodb/` handles AWS access.

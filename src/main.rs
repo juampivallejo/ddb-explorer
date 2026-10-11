@@ -8,6 +8,9 @@ use gpui::{
 };
 
 fn main() {
+    // GPUI reports platform/event-loop failures through the log facade.
+    log::set_logger(&ErrorLogger).expect("failed to initialize logging");
+    log::set_max_level(log::LevelFilter::Warn);
     Application::new().run(|cx: &mut App| {
         cx.open_window(
             WindowOptions {
@@ -19,7 +22,7 @@ fn main() {
                 }),
                 ..Default::default()
             },
-            |_, cx| cx.new(|_| Explorer::default()),
+            |_, cx| cx.new(Explorer::new),
         )
         .expect("failed to open the gpui-demo window");
 
@@ -32,4 +35,20 @@ fn main() {
 
         cx.activate(true);
     });
+}
+
+struct ErrorLogger;
+
+impl log::Log for ErrorLogger {
+    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+        metadata.level() <= log::Level::Warn
+    }
+
+    fn log(&self, record: &log::Record<'_>) {
+        if self.enabled(record.metadata()) {
+            eprintln!("{}: {}", record.level(), record.args());
+        }
+    }
+
+    fn flush(&self) {}
 }
