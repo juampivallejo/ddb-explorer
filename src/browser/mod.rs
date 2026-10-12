@@ -1,3 +1,4 @@
+mod item_detail;
 mod query;
 mod query_form;
 mod results;
@@ -7,7 +8,8 @@ use crate::{
     dynamodb::{Connection, DynamoDbService, KeyTarget, LoadError, ReadOperation, ReadRequest},
     ui,
 };
-use gpui_kit::{Context, IntoElement, Render, Task, Window, div, prelude::*};
+use gpui_kit::{AppContext, Context, Entity, IntoElement, Render, Task, Window, div, prelude::*};
+use item_detail::ItemDetail;
 use query::ReadMode;
 use query_form::QueryInputs;
 use state::{BrowserState, PendingRead};
@@ -22,6 +24,7 @@ pub struct ItemBrowser {
     state: BrowserState,
     mode: ReadMode,
     inputs: QueryInputs,
+    detail: Entity<ItemDetail>,
     validation: Option<String>,
     schema_task: Option<Task<()>>,
     schema_indicator_task: Option<Task<()>>,
@@ -36,6 +39,7 @@ impl ItemBrowser {
             state: BrowserState::default(),
             mode: ReadMode::default(),
             inputs: QueryInputs::new(window, cx),
+            detail: cx.new(|cx| ItemDetail::new(window, cx)),
             validation: None,
             schema_task: None,
             schema_indicator_task: None,
@@ -146,7 +150,7 @@ impl ItemBrowser {
 }
 
 impl Render for ItemBrowser {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if self.state.schema.table().is_none() {
             return div()
                 .flex()
@@ -170,6 +174,6 @@ impl Render for ItemBrowser {
                     .overflow_y_scroll()
                     .child(self.controls(cx)),
             )
-            .child(self.results(cx))
+            .child(self.results(window, cx))
     }
 }

@@ -2,6 +2,7 @@
 
 use gpui_kit::component::{Theme, ThemeMode};
 use gpui_kit::{App, Div, Stateful, div, prelude::*, rgb, rgba};
+use std::sync::Arc;
 
 pub const BACKGROUND: u32 = 0x111318;
 pub const PANEL: u32 = 0x191c23;
@@ -28,6 +29,9 @@ pub fn init_theme(cx: &mut App) {
         theme.colors.ring = rgb(ACCENT).into();
         theme.colors.caret = rgb(ACCENT).into();
         theme.colors.selection = rgba(SELECTION).into();
+        Arc::make_mut(&mut theme.highlight_theme)
+            .style
+            .editor_background = Some(rgb(ITEM_BACKGROUND).into());
     });
 }
 

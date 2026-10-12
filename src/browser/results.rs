@@ -1,13 +1,16 @@
 use super::{ItemBrowser, query::ReadMode};
-use crate::ui::{self, BORDER, HOVER, ITEM_BACKGROUND, MUTED, PANEL, SELECTED};
-use gpui_kit::component::{
-    IconName,
-    button::{Button, ButtonVariants},
-};
-use gpui_kit::{ClipboardItem, Context, Div, div, prelude::*, rgb};
+use crate::ui::{self, BORDER, HOVER, MUTED, PANEL, SELECTED};
+use gpui_kit::{Context, Div, Window, div, prelude::*, rgb};
 
 impl ItemBrowser {
-    pub(super) fn results(&self, cx: &mut Context<Self>) -> Div {
+    pub(super) fn results(&self, window: &mut Window, cx: &mut Context<Self>) -> Div {
+        let selected = self.state.reads.displayed.as_ref().and_then(|displayed| {
+            displayed
+                .selected_item
+                .and_then(|index| displayed.page.items.get(index))
+        });
+        self.detail
+            .update(cx, |detail, cx| detail.set_item(selected, window, cx));
         let Some(displayed) = &self.state.reads.displayed else {
             // An empty state describes a settled view, not a request in flight.
             if self.state.schema.is_loading()
@@ -95,43 +98,11 @@ impl ItemBrowser {
                         cx.notify();
                     }))
             }));
-        let mut detail = div().flex().flex_col().flex_1().min_w_0().min_h_0();
-        if let Some(item) = displayed
-            .selected_item
-            .and_then(|index| page.items.get(index))
-        {
-            let json = serde_json::to_string_pretty(item).expect("JSON values serialize");
-            let copy = json.clone();
-            detail = detail
-                .bg(rgb(ITEM_BACKGROUND))
-                .child(
-                    div().flex().justify_end().p_2().child(
-                        Button::new("copy-json")
-                            .ghost()
-                            .icon(IconName::Copy)
-                            .tooltip("Copy JSON")
-                            .on_click(cx.listener(move |_, _, _, cx| {
-                                cx.write_to_clipboard(ClipboardItem::new_string(copy.clone()));
-                            })),
-                    ),
-                )
-                .child(
-                    div()
-                        .id("json-detail")
-                        .flex_1()
-                        .min_h_0()
-                        .overflow_scroll()
-                        .p_4()
-                        .font_family("monospace")
-                        .text_sm()
-                        .children(json.lines().map(|line| div().child(line.to_owned()))),
-                );
-        } else {
-            detail = detail.child(ui::empty_state(
-                "No matching items",
-                "Try another key value or read the next page if available.",
-            ));
-        }
+        let detail = div()
+            .flex_1()
+            .min_w_0()
+            .min_h_0()
+            .child(self.detail.clone());
         div()
             .flex()
             .flex_col()
