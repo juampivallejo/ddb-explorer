@@ -45,6 +45,9 @@ It retries unprocessed batch writes. The fixtures include:
 - `Events`: 40 items with partition key `pk`, sort key `sk`, and the
   `ByEventType` global secondary index.
 - `EmptyTable`: a table with no seeded items.
+- `SampleTable001` through `SampleTable097`: empty tables with string `id`
+  primary keys, bringing the seeded total to 100 tables for sidebar browsing
+  and filtering. The seed script generates these definitions automatically.
 
 Query a partition and its index:
 
