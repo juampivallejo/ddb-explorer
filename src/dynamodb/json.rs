@@ -7,10 +7,14 @@ use serde_json::{Number, Value};
 use std::str::FromStr;
 
 pub(super) fn item_json(item: Item) -> Result<Value, LoadError> {
-    item.into_iter()
+    let mut object = item
+        .into_iter()
         .map(|(name, value)| Ok((name, attribute_json(value)?)))
-        .collect::<Result<serde_json::Map<_, _>, LoadError>>()
-        .map(Value::Object)
+        .collect::<Result<serde_json::Map<_, _>, LoadError>>()?;
+    // GPUI enables preserve_order, so JSON keys follow insertion order.
+    // Sort them explicitly to keep the output alphabetical and consistent.
+    object.sort_keys();
+    Ok(Value::Object(object))
 }
 
 pub(super) fn attribute_json(value: AttributeValue) -> Result<Value, LoadError> {
@@ -50,6 +54,34 @@ pub(super) fn attribute_json(value: AttributeValue) -> Result<Value, LoadError> 
 mod tests {
     use super::*;
     use std::collections::HashMap;
+
+    #[test]
+    fn object_keys_are_sorted_recursively_without_reordering_arrays() {
+        let nested = || {
+            AttributeValue::M(HashMap::from([
+                ("z".into(), AttributeValue::N("2".into())),
+                ("a".into(), AttributeValue::N("1".into())),
+            ]))
+        };
+        let item = HashMap::from([
+            ("z".into(), AttributeValue::Bool(true)),
+            ("nested".into(), nested()),
+            (
+                "items".into(),
+                AttributeValue::L(vec![
+                    AttributeValue::S("zebra".into()),
+                    AttributeValue::S("apple".into()),
+                    nested(),
+                ]),
+            ),
+            ("a".into(), AttributeValue::Null(true)),
+        ]);
+        assert_eq!(
+            item_json(item).unwrap().to_string(),
+            r#"{"a":null,"items":["zebra","apple",{"a":1,"z":2}],"nested":{"a":1,"z":2},"z":true}"#,
+        );
+    }
+
     #[test]
     fn plain_json_preserves_numbers_and_nested_types() {
         let value = attribute_json(AttributeValue::M(HashMap::from([

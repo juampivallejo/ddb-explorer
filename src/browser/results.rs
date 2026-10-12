@@ -1,6 +1,46 @@
 use super::{ItemBrowser, query::ReadMode};
 use crate::ui::{self, BORDER, HOVER, MUTED, PANEL, SELECTED};
-use gpui_kit::{Context, Div, Window, div, prelude::*, rgb};
+use gpui_kit::component::{
+    IconName, Sizable,
+    button::{Button, ButtonVariants},
+};
+use gpui_kit::{ClipboardItem, Context, Div, Window, div, prelude::*, rgb};
+
+fn key_row(
+    index: usize,
+    kind: &'static str,
+    name: &str,
+    value: &serde_json::Value,
+    cx: &mut Context<ItemBrowser>,
+) -> Div {
+    let copy_value = value
+        .as_str()
+        .map(str::to_owned)
+        .unwrap_or_else(|| value.to_string());
+    div()
+        .flex()
+        .items_center()
+        .gap_1()
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .text_ellipsis()
+                .child(value.to_string()),
+        )
+        .child(
+            Button::new((kind, index))
+                .ghost()
+                .small()
+                .flex_shrink_0()
+                .icon(IconName::Copy)
+                .tooltip(format!("Copy {name}"))
+                .on_click(cx.listener(move |_, _, _, cx| {
+                    cx.stop_propagation();
+                    cx.write_to_clipboard(ClipboardItem::new_string(copy_value.clone()));
+                })),
+        )
+}
 
 impl ItemBrowser {
     pub(super) fn results(&self, window: &mut Window, cx: &mut Context<Self>) -> Div {
@@ -73,15 +113,20 @@ impl ItemBrowser {
             .border_color(rgb(BORDER))
             .children(page.items.iter().enumerate().map(|(index, item)| {
                 let target = &displayed.request.target;
-                let title = item
-                    .get(&target.partition.name)
-                    .map(serde_json::Value::to_string)
-                    .unwrap_or_else(|| format!("Item {}", index + 1));
+                let title = match item.get(&target.partition.name) {
+                    Some(value) => key_row(
+                        index,
+                        "copy-partition-key",
+                        &target.partition.name,
+                        value,
+                        cx,
+                    ),
+                    None => div().child(format!("Item {}", index + 1)),
+                };
                 let sort = target
                     .sort
                     .as_ref()
-                    .and_then(|key| item.get(&key.name))
-                    .map(serde_json::Value::to_string);
+                    .and_then(|key| item.get(&key.name).map(|value| (key, value)));
                 div()
                     .id(("item", index))
                     .p_2()
@@ -94,8 +139,12 @@ impl ItemBrowser {
                     .cursor_pointer()
                     .hover(|style| style.bg(rgb(HOVER)))
                     .child(title)
-                    .when_some(sort, |item, sort| {
-                        item.child(div().text_sm().text_color(rgb(MUTED)).child(sort))
+                    .when_some(sort, |item, (key, value)| {
+                        item.child(
+                            key_row(index, "copy-sort-key", &key.name, value, cx)
+                                .text_sm()
+                                .text_color(rgb(MUTED)),
+                        )
                     })
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.state.reads.select_item(index);
