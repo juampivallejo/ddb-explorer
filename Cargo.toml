@@ -17,3 +17,6 @@ dirs = "5"
 tempfile = "3"
 base64 = "0.22"
 gpui-kit = { version = "=0.7.1", features = ["tree-sitter"] }
+
+[dev-dependencies]
+gpui-kit = { version = "=0.7.1", features = ["test-support"] }

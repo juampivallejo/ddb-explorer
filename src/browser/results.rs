@@ -5,9 +5,13 @@ use gpui_kit::{Context, Div, Window, div, prelude::*, rgb};
 impl ItemBrowser {
     pub(super) fn results(&self, window: &mut Window, cx: &mut Context<Self>) -> Div {
         let selected = self.state.reads.displayed.as_ref().and_then(|displayed| {
-            displayed
-                .selected_item
-                .and_then(|index| displayed.page.items.get(index))
+            displayed.selected_item.and_then(|index| {
+                displayed
+                    .page
+                    .items
+                    .get(index)
+                    .map(|item| ((displayed.id, index), item))
+            })
         });
         self.detail
             .update(cx, |detail, cx| detail.set_item(selected, window, cx));

@@ -49,6 +49,7 @@ impl ItemBrowser {
 
     fn reset_read(&mut self, cx: &mut Context<Self>) {
         self.read_task = None;
+        self.detail.update(cx, |detail, cx| detail.clear(cx));
         self.state.reads.reset();
         self.validation = None;
         cx.notify();
@@ -58,6 +59,7 @@ impl ItemBrowser {
         self.schema_task = None;
         self.schema_indicator_task = None;
         self.read_task = None;
+        self.detail.update(cx, |detail, cx| detail.clear(cx));
         self.state.clear();
         self.inputs.reset(window, cx);
         self.validation = None;
@@ -74,6 +76,7 @@ impl ItemBrowser {
         self.schema_task = None;
         self.schema_indicator_task = None;
         self.read_task = None;
+        self.detail.update(cx, |detail, cx| detail.clear(cx));
         self.inputs.reset(window, cx);
         self.validation = None;
         self.connection = connection;

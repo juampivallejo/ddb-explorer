@@ -111,6 +111,7 @@ impl BrowserState {
 }
 
 pub(super) struct LoadedPage {
+    pub id: u64,
     pub request: ReadRequest,
     pub page: ItemPage,
     pub selected_item: Option<usize>,
@@ -234,6 +235,7 @@ impl ReadState {
         match result {
             Ok(page) => {
                 self.displayed = Some(LoadedPage {
+                    id,
                     selected_item: (!page.items.is_empty()).then_some(0),
                     request,
                     page,
