@@ -15,6 +15,7 @@ fn main() {
         .run(|cx: &mut App| {
             gpui_kit::init(cx);
             ui::init_theme(cx);
+            let service = dynamodb::DynamoDbService::new().expect("failed to start AWS runtime");
             gpui_kit::open_window(
                 WindowOptions {
                     window_bounds: Some(WindowBounds::Maximized(Bounds::maximized(None, cx))),
@@ -26,7 +27,7 @@ fn main() {
                     ..Default::default()
                 },
                 cx,
-                |window, cx| cx.new(|cx| Explorer::new(window, cx)),
+                |window, cx| cx.new(|cx| Explorer::new(service, window, cx)),
             )
             .expect("failed to open the gpui-demo window");
 

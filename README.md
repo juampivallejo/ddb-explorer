@@ -46,4 +46,6 @@ cargo clippy --all-targets -- -D warnings
 ```
 
 `src/main.rs` starts the app, `src/app.rs` holds the explorer view and state,
-`src/ui/` contains shared components, and `src/dynamodb/` handles AWS access.
+`src/browser/` separates query forms, results, and testable state transitions.
+`src/dynamodb/` owns the shared AWS runtime and clients; its `json.rs` adapter
+contains the plain JSON conversion. Shared styling lives in `src/ui/`.

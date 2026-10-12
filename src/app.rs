@@ -2,11 +2,12 @@ use gpui_kit::{Context, Div, Entity, IntoElement, Render, Task, Window, div, pre
 
 use crate::{
     browser::ItemBrowser,
-    dynamodb::{self, Connection, LoadError},
+    dynamodb::{Connection, DynamoDbService, LoadError},
     ui::{self, ACCENT, BACKGROUND, BORDER, ERROR, HOVER, MUTED, PANEL, SELECTED, TEXT},
 };
 
 pub struct Explorer {
+    service: DynamoDbService,
     connection: Connection,
     browser: Entity<ItemBrowser>,
     tables: Vec<String>,
@@ -18,10 +19,11 @@ pub struct Explorer {
 }
 
 impl Explorer {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(service: DynamoDbService, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut explorer = Self {
             connection: Connection::Local,
-            browser: cx.new(|cx| ItemBrowser::new(window, cx)),
+            browser: cx.new(|cx| ItemBrowser::new(service.clone(), window, cx)),
+            service,
             tables: Vec::new(),
             selected_table: None,
             loading: false,
@@ -42,9 +44,7 @@ impl Explorer {
         let connection = self.connection;
         self.loading = true;
         self.error = None;
-        let task = cx
-            .background_executor()
-            .spawn(async move { dynamodb::load_tables(connection) });
+        let task = self.service.list_tables(connection);
         self.load_task = Some(cx.spawn(async move |this, cx| {
             let result = task.await;
             let _ = this.update(cx, |this, cx| {
@@ -171,6 +171,9 @@ impl Explorer {
                                     .hover(|style| style.bg(rgb(HOVER)))
                                     .child(table.clone())
                                     .on_click(cx.listener(move |this, _, window, cx| {
+                                        if this.selected_table.as_ref() == Some(&name) {
+                                            return;
+                                        }
                                         this.selected_table = Some(name.clone());
                                         this.browser.update(cx, |browser, cx| {
                                             browser.open(this.connection, name.clone(), window, cx)
