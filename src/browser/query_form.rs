@@ -55,6 +55,19 @@ impl QueryInputs {
 
 impl ItemBrowser {
     pub(super) fn controls(&self, cx: &mut Context<Self>) -> Div {
+        // Don't render a partial form: its divider would jump from the collapsed
+        // form's height to the full form's height when metadata arrives.
+        if self.state.schema.is_loading() {
+            return div().p_4().child(
+                div()
+                    .h_5()
+                    .text_sm()
+                    .text_color(rgb(MUTED))
+                    .when(self.state.schema.loading_indicator_visible(), |status| {
+                        status.child("Loading table keys…")
+                    }),
+            );
+        }
         let mut controls = div()
             .flex()
             .flex_col()
@@ -205,10 +218,7 @@ impl ItemBrowser {
                     })))
                     .child(ui::choice("cancel-scan", "Cancel", false).on_click(cx.listener(|this, _, _, cx| { this.state.reads.cancel_scan(); cx.notify(); })))));
         }
-        if self.state.schema.is_loading() {
-            controls = controls.child("Loading table keys…");
-        }
-        // Reserve this line so starting or finishing a read doesn't shift the results.
+        // Reserve a status row so item reads don't shift the form's divider.
         controls = controls.child(div().h_5().text_sm().text_color(rgb(MUTED)).when(
             self.state.reads.is_loading(),
             |status| {

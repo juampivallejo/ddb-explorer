@@ -7,6 +7,7 @@ pub(super) enum SchemaState {
     Unselected,
     Loading {
         table: String,
+        indicator_visible: bool,
     },
     Ready {
         table: String,
@@ -22,9 +23,9 @@ impl SchemaState {
     pub fn table(&self) -> Option<&str> {
         match self {
             Self::Unselected => None,
-            Self::Loading { table } | Self::Ready { table, .. } | Self::Failed { table, .. } => {
-                Some(table)
-            }
+            Self::Loading { table, .. }
+            | Self::Ready { table, .. }
+            | Self::Failed { table, .. } => Some(table),
         }
     }
 
@@ -37,6 +38,15 @@ impl SchemaState {
 
     pub fn is_loading(&self) -> bool {
         matches!(self, Self::Loading { .. })
+    }
+    pub fn loading_indicator_visible(&self) -> bool {
+        matches!(
+            self,
+            Self::Loading {
+                indicator_visible: true,
+                ..
+            }
+        )
     }
     pub fn error(&self) -> Option<LoadError> {
         match self {
@@ -62,8 +72,25 @@ impl BrowserState {
 
     pub fn open(&mut self, table: String) -> u64 {
         self.clear();
-        self.schema = SchemaState::Loading { table };
+        self.schema = SchemaState::Loading {
+            table,
+            indicator_visible: false,
+        };
         self.schema_generation
+    }
+
+    pub fn reveal_schema_loading(&mut self, generation: u64) -> bool {
+        if generation != self.schema_generation {
+            return false;
+        }
+        if let SchemaState::Loading {
+            indicator_visible, ..
+        } = &mut self.schema
+        {
+            *indicator_visible = true;
+            return true;
+        }
+        false
     }
 
     pub fn finish_schema(
@@ -87,7 +114,6 @@ pub(super) struct LoadedPage {
     pub request: ReadRequest,
     pub page: ItemPage,
     pub selected_item: Option<usize>,
-    pub copied: bool,
 }
 
 pub(super) struct PreparedScan {
@@ -209,7 +235,6 @@ impl ReadState {
             Ok(page) => {
                 self.displayed = Some(LoadedPage {
                     selected_item: (!page.items.is_empty()).then_some(0),
-                    copied: false,
                     request,
                     page,
                 });
@@ -224,13 +249,6 @@ impl ReadState {
             && index < displayed.page.items.len()
         {
             displayed.selected_item = Some(index);
-            displayed.copied = false;
-        }
-    }
-
-    pub fn mark_copied(&mut self) {
-        if let Some(displayed) = &mut self.displayed {
-            displayed.copied = true;
         }
     }
 }
@@ -272,6 +290,24 @@ mod tests {
     }
 
     #[test]
+    fn delayed_schema_indicator_only_appears_for_the_current_pending_request() {
+        let mut state = BrowserState::default();
+        let first = state.open("Events".into());
+        assert!(!state.schema.loading_indicator_visible());
+        let second = state.open("Books".into());
+        assert!(!state.reveal_schema_loading(first));
+        assert!(!state.schema.loading_indicator_visible());
+        assert!(state.reveal_schema_loading(second));
+        assert!(state.schema.loading_indicator_visible());
+        assert!(state.finish_schema(second, Err(LoadError::Network)));
+        assert!(!state.reveal_schema_loading(second));
+        assert!(!state.schema.loading_indicator_visible());
+        let third = state.open("Events".into());
+        state.clear();
+        assert!(!state.reveal_schema_loading(third));
+    }
+
+    #[test]
     fn old_results_cannot_finish_or_replace_a_new_request() {
         let mut state = ReadState::default();
         let old = state.query(request("old")).unwrap();
@@ -295,7 +331,6 @@ mod tests {
         let first = state.query(request("original")).unwrap();
         assert!(state.finish(first.id, Ok(page())));
         state.select_item(1);
-        state.mark_copied();
         let summary = state.displayed.as_ref().unwrap().request.summary();
         let refresh = state.query(request("replacement")).unwrap();
         assert_eq!(state.displayed.as_ref().unwrap().request.summary(), summary);
@@ -304,7 +339,6 @@ mod tests {
         assert_eq!(displayed.request.summary(), summary);
         assert_eq!(displayed.page.items, page().items);
         assert_eq!(displayed.selected_item, Some(1));
-        assert!(displayed.copied);
         assert_eq!(state.error(), Some(LoadError::Network));
     }
 

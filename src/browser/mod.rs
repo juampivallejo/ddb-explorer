@@ -11,8 +11,10 @@ use gpui_kit::{Context, IntoElement, Render, Task, Window, div, prelude::*};
 use query::ReadMode;
 use query_form::QueryInputs;
 use state::{BrowserState, PendingRead};
+use std::time::Duration;
 
 const PAGE_SIZE: i32 = 50;
+const LOADING_INDICATOR_DELAY: Duration = Duration::from_millis(150);
 
 pub struct ItemBrowser {
     service: DynamoDbService,
@@ -22,6 +24,7 @@ pub struct ItemBrowser {
     inputs: QueryInputs,
     validation: Option<String>,
     schema_task: Option<Task<()>>,
+    schema_indicator_task: Option<Task<()>>,
     read_task: Option<Task<()>>,
 }
 
@@ -35,6 +38,7 @@ impl ItemBrowser {
             inputs: QueryInputs::new(window, cx),
             validation: None,
             schema_task: None,
+            schema_indicator_task: None,
             read_task: None,
         }
     }
@@ -48,6 +52,7 @@ impl ItemBrowser {
 
     pub fn clear(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.schema_task = None;
+        self.schema_indicator_task = None;
         self.read_task = None;
         self.state.clear();
         self.inputs.reset(window, cx);
@@ -63,16 +68,28 @@ impl ItemBrowser {
         cx: &mut Context<Self>,
     ) {
         self.schema_task = None;
+        self.schema_indicator_task = None;
         self.read_task = None;
         self.inputs.reset(window, cx);
         self.validation = None;
         self.connection = connection;
         let generation = self.state.open(table.clone());
+        // Fast metadata responses never show a transient loading label.
+        let timer = cx.background_executor().timer(LOADING_INDICATOR_DELAY);
+        self.schema_indicator_task = Some(cx.spawn(async move |this, cx| {
+            timer.await;
+            let _ = this.update(cx, |this, cx| {
+                if this.state.reveal_schema_loading(generation) {
+                    cx.notify();
+                }
+            });
+        }));
         let request = self.service.describe_table(connection, table);
         self.schema_task = Some(cx.spawn(async move |this, cx| {
             let result = request.await;
             let _ = this.update(cx, |this, cx| {
                 if this.state.finish_schema(generation, result) {
+                    this.schema_indicator_task = None;
                     cx.notify();
                 }
             });

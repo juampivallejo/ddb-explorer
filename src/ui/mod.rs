@@ -5,6 +5,7 @@ use gpui_kit::{App, Div, Stateful, div, prelude::*, rgb, rgba};
 
 pub const BACKGROUND: u32 = 0x111318;
 pub const PANEL: u32 = 0x191c23;
+pub const ITEM_BACKGROUND: u32 = 0x171a20;
 pub const BORDER: u32 = 0x2c313c;
 pub const TEXT: u32 = 0xe6e9ef;
 pub const MUTED: u32 = 0x9aa4b5;

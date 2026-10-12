@@ -1,5 +1,9 @@
 use super::{ItemBrowser, query::ReadMode};
-use crate::ui::{self, BORDER, HOVER, MUTED, PANEL, SELECTED};
+use crate::ui::{self, BORDER, HOVER, ITEM_BACKGROUND, MUTED, PANEL, SELECTED};
+use gpui_kit::component::{
+    IconName,
+    button::{Button, ButtonVariants},
+};
 use gpui_kit::{ClipboardItem, Context, Div, div, prelude::*, rgb};
 
 impl ItemBrowser {
@@ -99,22 +103,16 @@ impl ItemBrowser {
             let json = serde_json::to_string_pretty(item).expect("JSON values serialize");
             let copy = json.clone();
             detail = detail
+                .bg(rgb(ITEM_BACKGROUND))
                 .child(
-                    div().p_3().child(
-                        ui::choice(
-                            "copy-json",
-                            if displayed.copied {
-                                "Copied"
-                            } else {
-                                "Copy JSON"
-                            },
-                            false,
-                        )
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            cx.write_to_clipboard(ClipboardItem::new_string(copy.clone()));
-                            this.state.reads.mark_copied();
-                            cx.notify();
-                        })),
+                    div().flex().justify_end().p_2().child(
+                        Button::new("copy-json")
+                            .ghost()
+                            .icon(IconName::Copy)
+                            .tooltip("Copy JSON")
+                            .on_click(cx.listener(move |_, _, _, cx| {
+                                cx.write_to_clipboard(ClipboardItem::new_string(copy.clone()));
+                            })),
                     ),
                 )
                 .child(
