@@ -10,7 +10,7 @@ use gpui_kit::{
 };
 use serde_json::Value;
 
-pub(super) struct ItemDetail {
+pub(crate) struct ItemDetail {
     editor: Entity<EditorState>,
     selection: Option<(u64, usize)>,
     json: Option<SharedString>,
@@ -19,6 +19,10 @@ pub(super) struct ItemDetail {
 }
 
 impl ItemDetail {
+    #[cfg(test)]
+    pub(crate) fn displayed_json(&self) -> Option<&str> {
+        self.json.as_deref()
+    }
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         Self {
             editor: cx.new(|cx| {

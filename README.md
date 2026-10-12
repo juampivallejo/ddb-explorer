@@ -8,6 +8,9 @@ Reads return one page at a time. Select an item to view and copy plain JSON.
 Sets become arrays and binary values use base64; numbers retain their precision.
 Filter table names or star favorites to keep them at the top; **Favorites only**
 narrows the list further. Local and terminal favorites are saved separately.
+History records successful queries and up to 50 returned primary keys per execution.
+Use **Save snapshot** to keep an item's historical JSON; **Restore query** fills
+the form on your current connection without running it.
 
 ## Build and run
 
@@ -42,7 +45,12 @@ See [scripts/README.md](scripts/README.md) for fixtures, queries, and reset comm
 Favorites are stored in `ddb-explorer/preferences.json` under the system's config
 directory: `$XDG_CONFIG_HOME` (or `~/.config`) on Linux, and
 `~/Library/Application Support` on macOS. Terminal favorites are shared across
-terminal AWS sessions. No credentials or item contents are saved.
+terminal AWS sessions. Favorite changes are merged under a file lock so multiple
+app instances can save safely. History lives under the system's local data directory in
+`ddb-explorer/history` (`$XDG_DATA_HOME` or `~/.local/share` on Linux,
+`~/Library/Application Support` on macOS). Item contents are saved only when you
+choose **Save snapshot**; credentials are never saved. History entries can be
+deleted individually, all at once, or when older than 30 days.
 
 ## Development
 

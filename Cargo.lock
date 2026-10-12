@@ -1850,6 +1850,7 @@ dependencies = [
  "aws-credential-types",
  "aws-sdk-dynamodb",
  "base64 0.22.1",
+ "chrono",
  "dirs",
  "gpui-kit",
  "log",

@@ -10,7 +10,8 @@ use table_sidebar::VisibleTable;
 use crate::{
     browser::ItemBrowser,
     dynamodb::{Connection, DynamoDbService, LoadError},
-    preferences::{PreferenceError, PreferenceStore, Preferences},
+    history::{History, RestoreQuery},
+    preferences::{FavoriteChange, PreferenceError, PreferenceStore, Preferences},
     ui::{self, ACCENT, BACKGROUND, BORDER, MUTED, TEXT},
 };
 
@@ -35,10 +36,34 @@ pub struct Explorer {
     save_id: u64,
     save_task: Option<Task<()>>,
     _filter_subscription: Subscription,
+    history: Entity<History>,
+    history_visible: bool,
+    _history_subscription: Subscription,
+    _history_observer: Subscription,
 }
 
 impl Explorer {
     pub fn new(service: DynamoDbService, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let history = cx.new(|cx| History::new(window, cx));
+        let history_observer = cx.observe(&history, |_, _, cx| cx.notify());
+        let history_subscription = cx.subscribe_in(
+            &history,
+            window,
+            |this, _, event: &RestoreQuery, window, cx| {
+                this.history_visible = false;
+                this.selected_table = Some(event.table.clone());
+                this.browser.update(cx, |browser, cx| {
+                    browser.restore_query(
+                        this.connection,
+                        event.table.clone(),
+                        event.query.clone(),
+                        window,
+                        cx,
+                    )
+                });
+                cx.notify();
+            },
+        );
         let table_filter = cx.new(|cx| InputState::new(window, cx).placeholder("Filter tables…"));
         let filter_subscription = cx.subscribe(&table_filter, |this, input, event, cx| {
             if matches!(event, InputEvent::Change) {
@@ -53,7 +78,7 @@ impl Explorer {
         };
         let mut explorer = Self {
             connection: Connection::Local,
-            browser: cx.new(|cx| ItemBrowser::new(service.clone(), window, cx)),
+            browser: cx.new(|cx| ItemBrowser::new(service.clone(), history.clone(), window, cx)),
             service,
             tables: Vec::new(),
             selected_table: None,
@@ -72,6 +97,10 @@ impl Explorer {
             save_id: 0,
             save_task: None,
             _filter_subscription: filter_subscription,
+            history,
+            history_visible: false,
+            _history_subscription: history_subscription,
+            _history_observer: history_observer,
         };
         explorer.refresh_tables(window, cx);
         explorer
@@ -206,7 +235,37 @@ impl Render for Explorer {
                     .py_4()
                     .border_b_1()
                     .border_color(rgb(BORDER))
-                    .child(div().text_lg().child("DynamoDB Explorer"))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_3()
+                            .child(div().text_lg().child("DynamoDB Explorer"))
+                            .child(
+                                ui::choice("explorer-tab", "Explorer", !self.history_visible)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.history_visible = false;
+                                        cx.notify();
+                                    })),
+                            )
+                            .child(
+                                ui::choice(
+                                    "history-tab",
+                                    if self.history.read(cx).has_error() {
+                                        "History · storage error"
+                                    } else {
+                                        "History"
+                                    },
+                                    self.history_visible,
+                                )
+                                .on_click(cx.listener(
+                                    |this, _, _, cx| {
+                                        this.history_visible = true;
+                                        cx.notify();
+                                    },
+                                )),
+                            ),
+                    )
                     .child(div().text_sm().text_color(rgb(ACCENT)).child("Read only")),
             )
             .child(
@@ -214,8 +273,12 @@ impl Render for Explorer {
                     .flex()
                     .flex_1()
                     .min_h_0()
-                    .child(self.sidebar(cx))
-                    .child(self.workspace(cx)),
+                    .when(!self.history_visible, |view| {
+                        view.child(self.sidebar(cx)).child(self.workspace(cx))
+                    })
+                    .when(self.history_visible, |view| {
+                        view.child(self.history.clone())
+                    }),
             )
     }
 }

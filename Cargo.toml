@@ -16,6 +16,7 @@ serde = { version = "1", features = ["derive"] }
 dirs = "5"
 tempfile = "3"
 base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
 gpui-kit = { version = "=0.7.1", features = ["tree-sitter"] }
 
 [dev-dependencies]

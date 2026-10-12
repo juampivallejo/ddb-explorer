@@ -1,4 +1,4 @@
-use super::Explorer;
+use super::{Explorer, FavoriteChange};
 use crate::{
     preferences::PreferenceError,
     ui::{self, ACCENT, BORDER, ERROR, HOVER, MUTED, PANEL, SELECTED, TEXT},
@@ -104,6 +104,16 @@ impl Explorer {
         if self.preference_store.is_none() {
             return;
         }
+        let change = FavoriteChange {
+            connection: self.connection,
+            table: table.to_owned(),
+            favorite: !self.preferences.favorites(self.connection).contains(table),
+        };
+        self.preserve_table_scroll(table, |this| this.preferences.apply(&change));
+        self.save_preferences(Some(change), cx);
+    }
+
+    fn preserve_table_scroll(&mut self, changed_table: &str, update: impl FnOnce(&mut Self)) {
         let scroll = {
             let state = self.table_scroll.0.borrow();
             state.last_item_size.and_then(|size| {
@@ -113,35 +123,43 @@ impl Explorer {
                 let row_height = size.contents.height / self.visible_tables.len() as f32;
                 let anchor = ScrollAnchor::capture(
                     &self.visible_tables,
-                    table,
+                    changed_table,
                     row_height,
                     state.base_handle.offset().y,
                 )?;
                 Some((anchor, row_height, state.base_handle.clone()))
             })
         };
-        self.preferences.toggle_favorite(self.connection, table);
+        update(self);
         self.rebuild_visible_tables();
         if let Some((anchor, row_height, handle)) = scroll
             && let Some(offset_y) = anchor.offset_y(&self.visible_tables, row_height)
         {
             handle.set_offset(point(handle.offset().x, offset_y));
         }
-        self.save_preferences(cx);
     }
 
-    fn save_preferences(&mut self, cx: &mut Context<Self>) {
+    fn save_preferences(&mut self, change: Option<FavoriteChange>, cx: &mut Context<Self>) {
         let Some(store) = &self.preference_store else {
             return;
         };
         self.save_id += 1;
         let save_id = self.save_id;
-        let result = store.save(self.preferences.clone());
+        let result = match change {
+            Some(change) => store.save(change),
+            None => store.retry(),
+        };
         self.save_task = Some(cx.spawn(async move |this, cx| {
             let result = result.await.unwrap_or(Err(PreferenceError::Save));
             let _ = this.update(cx, |this, cx| {
                 if this.save_id == save_id {
-                    this.preference_error = result.err();
+                    match result {
+                        Ok(preferences) => {
+                            this.preserve_table_scroll("", |this| this.preferences = preferences);
+                            this.preference_error = None;
+                        }
+                        Err(error) => this.preference_error = Some(error),
+                    }
                     cx.notify();
                 }
             });
@@ -258,7 +276,7 @@ impl Explorer {
             if error == PreferenceError::Save {
                 panel = panel.child(
                     ui::choice("retry-preferences", "Retry saving", false)
-                        .on_click(cx.listener(|this, _, _, cx| this.save_preferences(cx))),
+                        .on_click(cx.listener(|this, _, _, cx| this.save_preferences(None, cx))),
                 );
             }
         }

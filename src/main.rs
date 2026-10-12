@@ -1,6 +1,7 @@
 mod app;
 mod browser;
 mod dynamodb;
+mod history;
 mod preferences;
 mod ui;
 

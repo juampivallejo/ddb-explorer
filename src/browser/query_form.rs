@@ -245,7 +245,9 @@ impl ItemBrowser {
                 controls = controls.child(ui::choice("retry-schema", "Retry", false).on_click(
                     cx.listener(|this, _, window, cx| {
                         if let Some(table) = this.state.schema.table().map(str::to_owned) {
+                            let restore = this.restore.clone();
                             this.open(this.connection, table, window, cx);
+                            this.restore = restore;
                         }
                     }),
                 ));
@@ -253,6 +255,9 @@ impl ItemBrowser {
         }
         if let Some(error) = &self.validation {
             controls = controls.child(div().text_color(rgb(ERROR)).child(error.clone()));
+        }
+        if let Some(notice) = &self.notice {
+            controls = controls.child(div().text_sm().text_color(rgb(MUTED)).child(notice.clone()));
         }
         controls
     }

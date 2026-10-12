@@ -81,6 +81,36 @@ impl ItemBrowser {
                 page.items.len(),
                 displayed.request.summary()
             )));
+        if matches!(
+            displayed.request.operation,
+            crate::dynamodb::ReadOperation::Query { .. }
+        ) && displayed.selected_item.is_some()
+        {
+            header = header.child(
+                ui::choice("save-item-snapshot", "Save snapshot", false).on_click(cx.listener(
+                    |this, _, _, cx| {
+                        let Some(displayed) = &this.state.reads.displayed else {
+                            return;
+                        };
+                        let Some(item) = displayed
+                            .selected_item
+                            .and_then(|index| displayed.page.items.get(index))
+                            .cloned()
+                        else {
+                            return;
+                        };
+                        let table = displayed.request.table.clone();
+                        let connection = this.connection;
+                        this.history.update(cx, |history, cx| {
+                            history.save_snapshot(connection, table, item, cx)
+                        });
+                        this.notice =
+                            Some("Snapshot queued for saving. Open History to view it.".into());
+                        cx.notify();
+                    },
+                )),
+            );
+        }
         if page.next_key.is_some() && !self.state.reads.is_loading() {
             header = header.child(
                 ui::choice(

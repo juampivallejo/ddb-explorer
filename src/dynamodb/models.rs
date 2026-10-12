@@ -55,7 +55,7 @@ pub struct TableSchema {
     pub targets: Vec<KeyTarget>,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SortOperator {
     #[default]
     Any,

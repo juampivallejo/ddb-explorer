@@ -139,6 +139,7 @@ fn classify_service_code(code: Option<&str>) -> LoadError {
         Some(
             "Throttling"
             | "ThrottlingException"
+            | "ProvisionedThroughputExceededException"
             | "RequestLimitExceeded"
             | "LimitExceededException",
         ) => LoadError::Throttled,
@@ -203,6 +204,10 @@ mod tests {
             ("ExpiredTokenException", LoadError::ExpiredSession),
             ("UnrecognizedClientException", LoadError::InvalidCredentials),
             ("ThrottlingException", LoadError::Throttled),
+            (
+                "ProvisionedThroughputExceededException",
+                LoadError::Throttled,
+            ),
             ("InternalServerError", LoadError::ServiceUnavailable),
             ("NewUnexpectedError", LoadError::Unexpected),
         ] {
