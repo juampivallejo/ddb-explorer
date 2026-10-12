@@ -1,4 +1,4 @@
-# gpui-demo
+# ddb-explorer
 
 A DynamoDB explorer in progress, built with Rust and
 [GPUI Kit](https://gpui-kit.com/) for Linux with Wayland.
@@ -17,11 +17,11 @@ The Nix shell provides Rust and the native build dependencies:
 ```sh
 nix-shell
 cargo build
-./target/debug/gpui-demo
+./target/debug/ddb-explorer
 ```
 
 For a release binary, use `cargo build --release` and run
-`./target/release/gpui-demo` from your terminal.
+`./target/release/ddb-explorer` from your terminal.
 Without Nix, install the dependencies listed in `shell.nix` and a Rust
 toolchain supporting edition 2024. On NixOS, enable `hardware.graphics.enable`.
 
@@ -39,7 +39,7 @@ DynamoDB runs at `http://127.0.0.1:8000` with persistent local data.
 Stop it with `docker compose down`.
 See [scripts/README.md](scripts/README.md) for fixtures, queries, and reset commands.
 
-Favorites are stored in `gpui-demo/preferences.json` under the system's config
+Favorites are stored in `ddb-explorer/preferences.json` under the system's config
 directory: `$XDG_CONFIG_HOME` (or `~/.config`) on Linux, and
 `~/Library/Application Support` on macOS. Terminal favorites are shared across
 terminal AWS sessions. No credentials or item contents are saved.

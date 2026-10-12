@@ -30,7 +30,7 @@ fn main() {
                 cx,
                 |window, cx| cx.new(|cx| Explorer::new(service, window, cx)),
             )
-            .expect("failed to open the gpui-demo window");
+            .expect("failed to open the ddb-explorer window");
 
             cx.on_window_closed(|cx, _| {
                 if cx.windows().is_empty() {

@@ -84,7 +84,7 @@ impl PreferenceStore {
                 log::warn!("Couldn't locate the preferences directory");
                 PreferenceError::Load
             })?
-            .join("gpui-demo")
+            .join("ddb-explorer")
             .join("preferences.json");
         Self::open_at(path)
     }
