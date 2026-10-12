@@ -1,7 +1,12 @@
 //! Read-only DynamoDB access, independent of GPUI.
 
 mod error;
+mod items;
 pub use error::LoadError;
+pub use items::{
+    Item, ItemPage, KeyTarget, ReadOperation, ReadRequest, SortOperator, TableSchema,
+    describe_table, read_items,
+};
 
 use std::time::Duration;
 
@@ -22,6 +27,27 @@ fn load_tables_with_page_size(
     connection: Connection,
     page_size: i32,
 ) -> Result<Vec<String>, LoadError> {
+    run_request(connection, |client| async move {
+        let mut tables = Vec::new();
+        let mut pages = client
+            .list_tables()
+            .limit(page_size)
+            .into_paginator()
+            .send();
+        while let Some(page) = pages.next().await {
+            tables.extend(sdk_result(page)?.table_names().iter().cloned());
+        }
+        tables.sort();
+        tables.dedup();
+        Ok(tables)
+    })
+}
+
+fn run_request<T, F, Fut>(connection: Connection, operation: F) -> Result<T, LoadError>
+where
+    F: FnOnce(Client) -> Fut,
+    Fut: std::future::Future<Output = Result<T, LoadError>>,
+{
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -29,12 +55,10 @@ fn load_tables_with_page_size(
             log::warn!("Could not start AWS runtime: {error}");
             LoadError::Unexpected
         })?;
-
     runtime.block_on(async {
         tokio::time::timeout(Duration::from_secs(30), async {
             let client = match connection {
                 Connection::Local => {
-                    // Do not consult inherited profiles or credentials for local access.
                     let config = aws_sdk_dynamodb::Config::builder()
                         .behavior_version(BehaviorVersion::latest())
                         .endpoint_url(LOCAL_ENDPOINT)
@@ -53,32 +77,23 @@ fn load_tables_with_page_size(
                     Client::new(&config)
                 }
             };
-
-            let mut tables = Vec::new();
-            let mut pages = client
-                .list_tables()
-                .limit(page_size)
-                .into_paginator()
-                .send();
-            while let Some(page) = pages.next().await {
-                let page = page.map_err(|error| {
-                    log::warn!(
-                        "DynamoDB table discovery failed: {}",
-                        aws_sdk_dynamodb::error::DisplayErrorContext(&error)
-                    );
-                    error::classify(&error)
-                })?;
-                tables.extend(page.table_names().iter().cloned());
-            }
-            tables.sort();
-            tables.dedup();
-            Ok(tables)
+            operation(client).await
         })
         .await
-        .map_err(|_| {
-            log::warn!("DynamoDB table discovery timed out after 30 seconds");
-            LoadError::Timeout
-        })?
+        .map_err(|_| LoadError::Timeout)?
+    })
+}
+
+fn sdk_result<T, E>(result: Result<T, aws_sdk_dynamodb::error::SdkError<E>>) -> Result<T, LoadError>
+where
+    E: std::error::Error + aws_sdk_dynamodb::error::ProvideErrorMetadata + 'static,
+{
+    result.map_err(|error| {
+        log::warn!(
+            "DynamoDB request failed: {}",
+            aws_sdk_dynamodb::error::DisplayErrorContext(&error)
+        );
+        error::classify(&error)
     })
 }
 

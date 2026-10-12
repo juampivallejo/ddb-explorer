@@ -11,6 +11,6 @@ aws-credential-types = "1"
 aws-sdk-dynamodb = "1"
 tokio = { version = "1", features = ["rt", "time", "net"] }
 log = "0.4"
-gpui = { version = "=0.2.2", default-features = false, features = ["wayland"] }
-# GPUI's transitive xattr 0.2.3 dependency needs the ENOATTR alias removed in 0.2.190.
-libc = "=0.2.189"
+serde_json = { version = "1", features = ["arbitrary_precision"] }
+base64 = "0.22"
+gpui-kit = "=0.7.1"

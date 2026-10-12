@@ -5,6 +5,7 @@ let
     fontconfig
     freetype
     libxkbcommon
+    libxcb
     wayland
     vulkan-loader
     openssl

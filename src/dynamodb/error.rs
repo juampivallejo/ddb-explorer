@@ -1,9 +1,7 @@
 use std::error::Error;
 
 use aws_credential_types::provider::error::{CredentialsError, TokenError};
-use aws_sdk_dynamodb::{
-    error::{ProvideErrorMetadata, SdkError},
-};
+use aws_sdk_dynamodb::error::{ProvideErrorMetadata, SdkError};
 
 use super::Connection;
 
@@ -75,14 +73,18 @@ impl LoadError {
             }
             Self::Timeout => "Check your connection and AWS sign-in, then refresh.",
             Self::Throttled | Self::ServiceUnavailable => "Wait a moment, then refresh.",
-            Self::InvalidRequest => "Check the key values, types, and sort-key condition, then retry.",
+            Self::InvalidRequest => {
+                "Check the key values, types, and sort-key condition, then retry."
+            }
             Self::TableNotFound => "Refresh the table list and select the table again.",
             Self::Unexpected => "Try again. More details are available in the terminal.",
         }
     }
 }
 
-pub(super) fn classify<E: Error + ProvideErrorMetadata + 'static>(error: &SdkError<E>) -> LoadError {
+pub(super) fn classify<E: Error + ProvideErrorMetadata + 'static>(
+    error: &SdkError<E>,
+) -> LoadError {
     // Credential failures are often nested inside an SDK construction/dispatch error.
     let mut source: Option<&(dyn Error + 'static)> = Some(error);
     let mut credential_error = None;
@@ -187,7 +189,10 @@ mod tests {
             ),
         ];
         for (error, expected) in cases {
-            assert_eq!(classify(&TestSdkError::construction_failure(error)), expected);
+            assert_eq!(
+                classify(&TestSdkError::construction_failure(error)),
+                expected
+            );
         }
     }
 

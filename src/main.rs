@@ -1,40 +1,44 @@
 mod app;
+mod browser;
 mod dynamodb;
 mod ui;
 
 use app::Explorer;
-use gpui::{
-    App, AppContext, Application, Bounds, TitlebarOptions, WindowBounds, WindowOptions, px, size,
-};
+use gpui_kit::{App, AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions, px, size};
 
 fn main() {
     // GPUI reports platform/event-loop failures through the log facade.
     log::set_logger(&ErrorLogger).expect("failed to initialize logging");
     log::set_max_level(log::LevelFilter::Warn);
-    Application::new().run(|cx: &mut App| {
-        cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Maximized(Bounds::maximized(None, cx))),
-                window_min_size: Some(size(px(800.0), px(600.0))),
-                titlebar: Some(TitlebarOptions {
-                    title: Some("DynamoDB Explorer".into()),
+    gpui_kit::application()
+        .with_assets(gpui_kit::assets::Assets)
+        .run(|cx: &mut App| {
+            gpui_kit::init(cx);
+            ui::init_theme(cx);
+            gpui_kit::open_window(
+                WindowOptions {
+                    window_bounds: Some(WindowBounds::Maximized(Bounds::maximized(None, cx))),
+                    window_min_size: Some(size(px(800.0), px(600.0))),
+                    titlebar: Some(TitlebarOptions {
+                        title: Some("DynamoDB Explorer".into()),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            },
-            |_, cx| cx.new(Explorer::new),
-        )
-        .expect("failed to open the gpui-demo window");
+                },
+                cx,
+                |window, cx| cx.new(|cx| Explorer::new(window, cx)),
+            )
+            .expect("failed to open the gpui-demo window");
 
-        cx.on_window_closed(|cx| {
-            if cx.windows().is_empty() {
-                cx.quit();
-            }
-        })
-        .detach();
+            cx.on_window_closed(|cx, _| {
+                if cx.windows().is_empty() {
+                    cx.quit();
+                }
+            })
+            .detach();
 
-        cx.activate(true);
-    });
+            cx.activate(true);
+        });
 }
 
 struct ErrorLogger;

@@ -1,9 +1,11 @@
 # gpui-demo
 
 A DynamoDB explorer in progress, built with Rust and
-[GPUI](https://docs.rs/gpui/0.2.2/gpui/) for Linux with Wayland.
+[GPUI Kit](https://gpui-kit.com/) for Linux with Wayland.
 The app loads tables from local DynamoDB or your terminal's AWS session.
-Select a table in the sidebar; item browsing is not available yet.
+Select a table to query its primary key or a GSI, or explicitly confirm a scan.
+Reads return one page at a time. Select an item to view and copy plain JSON.
+Sets become arrays and binary values use base64; numbers retain their precision.
 
 ## Build and run
 

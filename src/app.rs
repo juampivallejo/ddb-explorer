@@ -1,14 +1,14 @@
-use gpui::{Context, Div, IntoElement, Render, Task, Window, div, prelude::*, rgb};
+use gpui_kit::{Context, Div, Entity, IntoElement, Render, Task, Window, div, prelude::*, rgb};
 
 use crate::{
-    dynamodb::{self, Connection, LoadError, ReadMode},
-    ui::{self, ACCENT, BACKGROUND, BORDER, ERROR, MUTED, PANEL, TEXT},
+    browser::ItemBrowser,
+    dynamodb::{self, Connection, LoadError},
+    ui::{self, ACCENT, BACKGROUND, BORDER, ERROR, HOVER, MUTED, PANEL, SELECTED, TEXT},
 };
 
-#[derive(Default)]
 pub struct Explorer {
     connection: Connection,
-    read_mode: ReadMode,
+    browser: Entity<ItemBrowser>,
     tables: Vec<String>,
     selected_table: Option<String>,
     loading: bool,
@@ -18,13 +18,25 @@ pub struct Explorer {
 }
 
 impl Explorer {
-    pub fn new(cx: &mut Context<Self>) -> Self {
-        let mut explorer = Self::default();
-        explorer.refresh_tables(cx);
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let mut explorer = Self {
+            connection: Connection::Local,
+            browser: cx.new(|cx| ItemBrowser::new(window, cx)),
+            tables: Vec::new(),
+            selected_table: None,
+            loading: false,
+            error: None,
+            request_id: 0,
+            load_task: None,
+        };
+        explorer.refresh_tables(window, cx);
         explorer
     }
 
-    fn refresh_tables(&mut self, cx: &mut Context<Self>) {
+    fn refresh_tables(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.selected_table = None;
+        self.browser
+            .update(cx, |browser, cx| browser.clear(window, cx));
         self.request_id += 1;
         let request_id = self.request_id;
         let connection = self.connection;
@@ -79,11 +91,11 @@ impl Explorer {
                     Connection::Terminal => "terminal-connection",
                 };
                 ui::choice(id, connection.label(), self.connection == connection).on_click(
-                    cx.listener(move |this, _, _, cx| {
+                    cx.listener(move |this, _, window, cx| {
                         this.tables.clear();
                         this.selected_table = None;
                         this.connection = connection;
-                        this.refresh_tables(cx);
+                        this.refresh_tables(window, cx);
                     }),
                 )
             }))
@@ -131,11 +143,9 @@ impl Explorer {
                                     .text_color(rgb(MUTED))
                                     .child(format!("TABLES ({})", self.tables.len())),
                             )
-                            .child(
-                                ui::choice("refresh-tables", "Refresh", false).on_click(
-                                    cx.listener(|this, _, _, cx| this.refresh_tables(cx)),
-                                ),
-                            ),
+                            .child(ui::choice("refresh-tables", "Refresh", false).on_click(
+                                cx.listener(|this, _, window, cx| this.refresh_tables(window, cx)),
+                            )),
                     )
                     .child(
                         div()
@@ -155,13 +165,16 @@ impl Explorer {
                                     .px_3()
                                     .py_2()
                                     .rounded_md()
-                                    .bg(rgb(if selected { 0x25344e } else { PANEL }))
+                                    .bg(rgb(if selected { SELECTED } else { PANEL }))
                                     .text_color(rgb(if selected { ACCENT } else { TEXT }))
                                     .cursor_pointer()
-                                    .hover(|style| style.bg(rgb(0x2a3445)))
+                                    .hover(|style| style.bg(rgb(HOVER)))
                                     .child(table.clone())
-                                    .on_click(cx.listener(move |this, _, _, cx| {
+                                    .on_click(cx.listener(move |this, _, window, cx| {
                                         this.selected_table = Some(name.clone());
+                                        this.browser.update(cx, |browser, cx| {
+                                            browser.open(this.connection, name.clone(), window, cx)
+                                        });
                                         cx.notify();
                                     }))
                             }))
@@ -188,7 +201,7 @@ impl Explorer {
             )
     }
 
-    fn workspace(&self, cx: &mut Context<Self>) -> Div {
+    fn workspace(&self, _cx: &mut Context<Self>) -> Div {
         div()
             .flex()
             .flex_col()
@@ -216,48 +229,7 @@ impl Explorer {
                             .child(self.connection.description()),
                     ),
             )
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap_3()
-                    .p_6()
-                    .border_b_1()
-                    .border_color(rgb(BORDER))
-                    .child(
-                        div()
-                            .flex()
-                            .gap_2()
-                            .children(ReadMode::ALL.into_iter().map(|mode| {
-                                let id = match mode {
-                                    ReadMode::Scan => "scan-mode",
-                                    ReadMode::Query => "query-mode",
-                                };
-                                ui::choice(id, mode.label(), self.read_mode == mode).on_click(
-                                    cx.listener(move |this, _, _, cx| {
-                                        this.read_mode = mode;
-                                        cx.notify();
-                                    }),
-                                )
-                            })),
-                    )
-                    .child(
-                        div()
-                            .text_sm()
-                            .text_color(rgb(MUTED))
-                            .child(self.read_mode.description()),
-                    ),
-            )
-            .child(div().flex().flex_col().flex_1().justify_center().child(
-                if self.selected_table.is_some() {
-                    ui::empty_state("Table selected", "Item browsing is not available yet.")
-                } else {
-                    ui::empty_state(
-                        "Select a table to explore",
-                        "Choose a table from the sidebar.",
-                    )
-                },
-            ))
+            .child(div().flex_1().min_h_0().child(self.browser.clone()))
     }
 }
 
