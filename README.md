@@ -8,6 +8,8 @@ Reads return one page at a time. Select an item to view and copy plain JSON.
 Sets become arrays and binary values use base64; numbers retain their precision.
 Filter table names or star favorites to keep them at the top; **Favorites only**
 narrows the list further. Local and terminal favorites are saved separately.
+Drag the sidebar's right edge to widen it for long table names, or hover over a
+name to see it in full.
 History records successful queries and up to 50 returned primary keys per execution.
 Use **Save snapshot** to keep an item's historical JSON; **Restore query** fills
 the form on your current connection without running it.

@@ -1,9 +1,10 @@
 mod table_sidebar;
 
 use gpui_kit::component::input::{InputEvent, InputState};
+use gpui_kit::component::resizable::{h_resizable, resizable_panel};
 use gpui_kit::{
     AppContext, Context, Div, Entity, IntoElement, Render, Subscription, Task,
-    UniformListScrollHandle, Window, div, prelude::*, rgb,
+    UniformListScrollHandle, Window, div, prelude::*, px, rgb,
 };
 use table_sidebar::VisibleTable;
 
@@ -274,7 +275,20 @@ impl Render for Explorer {
                     .flex_1()
                     .min_h_0()
                     .when(!self.history_visible, |view| {
-                        view.child(self.sidebar(cx)).child(self.workspace(cx))
+                        view.child(
+                            h_resizable("explorer-panels")
+                                .child(
+                                    resizable_panel()
+                                        .size(px(320.))
+                                        .size_range(px(280.)..gpui_kit::Pixels::MAX)
+                                        .child(self.sidebar(cx)),
+                                )
+                                .child(
+                                    resizable_panel()
+                                        .size_range(px(320.)..gpui_kit::Pixels::MAX)
+                                        .child(self.workspace(cx)),
+                                ),
+                        )
                     })
                     .when(self.history_visible, |view| {
                         view.child(self.history.clone())

@@ -334,7 +334,7 @@ impl Explorer {
         div()
             .flex()
             .flex_col()
-            .w_80()
+            .w_full()
             .h_full()
             .flex_shrink_0()
             .bg(rgb(PANEL))
