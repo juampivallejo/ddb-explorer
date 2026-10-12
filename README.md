@@ -64,3 +64,5 @@ cargo clippy --all-targets -- -D warnings
 `src/browser/` separates query forms, results, and testable state transitions.
 `src/dynamodb/` owns the shared AWS runtime and clients; its `json.rs` adapter
 contains the plain JSON conversion. Shared styling lives in `src/ui/`.
+
+Released under the [MIT license](LICENSE).
