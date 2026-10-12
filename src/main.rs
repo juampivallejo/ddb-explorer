@@ -1,6 +1,7 @@
 mod app;
 mod browser;
 mod dynamodb;
+mod preferences;
 mod ui;
 
 use app::Explorer;

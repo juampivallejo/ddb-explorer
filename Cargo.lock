@@ -2776,9 +2776,12 @@ dependencies = [
  "aws-credential-types",
  "aws-sdk-dynamodb",
  "base64 0.22.1",
+ "dirs",
  "gpui-kit",
  "log",
+ "serde",
  "serde_json",
+ "tempfile",
  "tokio",
 ]
 

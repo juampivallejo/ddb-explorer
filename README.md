@@ -6,6 +6,8 @@ The app loads tables from local DynamoDB or your terminal's AWS session.
 Select a table to query its primary key or a GSI, or explicitly confirm a scan.
 Reads return one page at a time. Select an item to view and copy plain JSON.
 Sets become arrays and binary values use base64; numbers retain their precision.
+Filter table names or star favorites to keep them at the top; **Favorites only**
+narrows the list further. Local and terminal favorites are saved separately.
 
 ## Build and run
 
@@ -36,6 +38,11 @@ docker compose up -d
 DynamoDB runs at `http://127.0.0.1:8000` with persistent local data.
 Stop it with `docker compose down`.
 See [scripts/README.md](scripts/README.md) for fixtures, queries, and reset commands.
+
+Favorites are stored in `gpui-demo/preferences.json` under the system's config
+directory: `$XDG_CONFIG_HOME` (or `~/.config`) on Linux, and
+`~/Library/Application Support` on macOS. Terminal favorites are shared across
+terminal AWS sessions. No credentials or item contents are saved.
 
 ## Development
 

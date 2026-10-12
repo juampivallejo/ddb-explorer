@@ -1,9 +1,17 @@
-use gpui_kit::{Context, Div, Entity, IntoElement, Render, Task, Window, div, prelude::*, rgb};
+mod table_sidebar;
+
+use gpui_kit::component::input::{InputEvent, InputState};
+use gpui_kit::{
+    AppContext, Context, Div, Entity, IntoElement, Render, Subscription, Task,
+    UniformListScrollHandle, Window, div, prelude::*, rgb,
+};
+use table_sidebar::VisibleTable;
 
 use crate::{
     browser::ItemBrowser,
     dynamodb::{Connection, DynamoDbService, LoadError},
-    ui::{self, ACCENT, BACKGROUND, BORDER, ERROR, HOVER, MUTED, PANEL, SELECTED, TEXT},
+    preferences::{PreferenceError, PreferenceStore, Preferences},
+    ui::{self, ACCENT, BACKGROUND, BORDER, MUTED, TEXT},
 };
 
 pub struct Explorer {
@@ -16,10 +24,33 @@ pub struct Explorer {
     error: Option<LoadError>,
     request_id: u64,
     load_task: Option<Task<()>>,
+    table_filter: Entity<InputState>,
+    filter_text: String,
+    favorites_only: bool,
+    visible_tables: Vec<VisibleTable>,
+    table_scroll: UniformListScrollHandle,
+    preferences: Preferences,
+    preference_store: Option<PreferenceStore>,
+    preference_error: Option<PreferenceError>,
+    save_id: u64,
+    save_task: Option<Task<()>>,
+    _filter_subscription: Subscription,
 }
 
 impl Explorer {
     pub fn new(service: DynamoDbService, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let table_filter = cx.new(|cx| InputState::new(window, cx).placeholder("Filter tables…"));
+        let filter_subscription = cx.subscribe(&table_filter, |this, input, event, cx| {
+            if matches!(event, InputEvent::Change) {
+                this.filter_text = input.read(cx).value().to_string();
+                this.reset_table_list();
+                cx.notify();
+            }
+        });
+        let (preference_store, preferences, preference_error) = match PreferenceStore::open() {
+            Ok((store, preferences)) => (Some(store), preferences, None),
+            Err(error) => (None, Preferences::default(), Some(error)),
+        };
         let mut explorer = Self {
             connection: Connection::Local,
             browser: cx.new(|cx| ItemBrowser::new(service.clone(), window, cx)),
@@ -30,6 +61,17 @@ impl Explorer {
             error: None,
             request_id: 0,
             load_task: None,
+            table_filter,
+            filter_text: String::new(),
+            favorites_only: false,
+            visible_tables: Vec::new(),
+            table_scroll: UniformListScrollHandle::new(),
+            preferences,
+            preference_store,
+            preference_error,
+            save_id: 0,
+            save_task: None,
+            _filter_subscription: filter_subscription,
         };
         explorer.refresh_tables(window, cx);
         explorer
@@ -70,6 +112,7 @@ impl Explorer {
                         this.error = Some(error);
                     }
                 }
+                this.reset_table_list();
                 cx.notify();
             });
         }));
@@ -95,6 +138,7 @@ impl Explorer {
                         this.tables.clear();
                         this.selected_table = None;
                         this.connection = connection;
+                        this.reset_table_list();
                         this.refresh_tables(window, cx);
                     }),
                 )
@@ -110,97 +154,6 @@ impl Explorer {
                     } else {
                         "Connected"
                     }),
-            )
-    }
-
-    fn sidebar(&self, cx: &mut Context<Self>) -> Div {
-        div()
-            .flex()
-            .flex_col()
-            .w_80()
-            .h_full()
-            .flex_shrink_0()
-            .bg(rgb(PANEL))
-            .border_r_1()
-            .border_color(rgb(BORDER))
-            .child(self.connection_panel(cx))
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .flex_1()
-                    .min_h_0()
-                    .p_4()
-                    .gap_4()
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .justify_between()
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(rgb(MUTED))
-                                    .child(format!("TABLES ({})", self.tables.len())),
-                            )
-                            .child(ui::choice("refresh-tables", "Refresh", false).on_click(
-                                cx.listener(|this, _, window, cx| this.refresh_tables(window, cx)),
-                            )),
-                    )
-                    .child(
-                        div()
-                            .id("table-list")
-                            .flex()
-                            .flex_col()
-                            .flex_1()
-                            .min_h_0()
-                            .overflow_y_scroll()
-                            .gap_2()
-                            .text_sm()
-                            .children(self.tables.iter().enumerate().map(|(index, table)| {
-                                let selected = self.selected_table.as_ref() == Some(table);
-                                let name = table.clone();
-                                div()
-                                    .id(("table", index))
-                                    .px_3()
-                                    .py_2()
-                                    .rounded_md()
-                                    .bg(rgb(if selected { SELECTED } else { PANEL }))
-                                    .text_color(rgb(if selected { ACCENT } else { TEXT }))
-                                    .cursor_pointer()
-                                    .hover(|style| style.bg(rgb(HOVER)))
-                                    .child(table.clone())
-                                    .on_click(cx.listener(move |this, _, window, cx| {
-                                        if this.selected_table.as_ref() == Some(&name) {
-                                            return;
-                                        }
-                                        this.selected_table = Some(name.clone());
-                                        this.browser.update(cx, |browser, cx| {
-                                            browser.open(this.connection, name.clone(), window, cx)
-                                        });
-                                        cx.notify();
-                                    }))
-                            }))
-                            .when(self.loading, |list| list.child("Loading tables…"))
-                            .when(
-                                !self.loading && self.error.is_none() && self.tables.is_empty(),
-                                |list| list.child("No tables in this connection"),
-                            )
-                            .when_some(self.error.as_ref(), |list, error| {
-                                list.child(
-                                    div()
-                                        .flex()
-                                        .flex_col()
-                                        .gap_2()
-                                        .child(div().text_color(rgb(ERROR)).child(error.title()))
-                                        .child(
-                                            div()
-                                                .text_color(rgb(MUTED))
-                                                .child(error.message(self.connection)),
-                                        ),
-                                )
-                            }),
-                    ),
             )
     }
 

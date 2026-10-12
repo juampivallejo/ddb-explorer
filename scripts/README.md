@@ -37,8 +37,11 @@ checked-in fixtures. Running it again overwrites fixture items with the same
 keys, preserves other items, and leaves existing table definitions unchanged.
 It retries unprocessed batch writes. The fixtures include:
 
-- `Books`: a simple string primary key and varied attribute types, including
-  numbers, booleans, nested maps/lists, sets, null, binary, and Unicode text.
+- `Books`: 8 items with a simple string primary key and varied attribute types,
+  including numbers, booleans, nested maps/lists, sets, null, binary, and Unicode
+  text. `book-6` and `book-7` each display 100 lines of formatted JSON in the item
+  viewer; `book-8` displays 1,000 lines, using lists of excerpts to exercise
+  scrolling through large items.
 - `Events`: 40 items with partition key `pk`, sort key `sk`, and the
   `ByEventType` global secondary index.
 - `EmptyTable`: a table with no seeded items.
