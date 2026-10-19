@@ -10,6 +10,16 @@ Filter table names or star favorites to keep them at the top; **Favorites only**
 narrows the list further. Local and terminal favorites are saved separately.
 Drag the sidebar's right edge to widen it for long table names, or hover over a
 name to see it in full.
+Hide or show the sidebar with **Ctrl+B**; **Ctrl+L** reveals and focuses the table
+filter. Query settings collapse with **Ctrl+Shift+Q**, keeping the draft summary
+and Run button visible. Expanded settings scroll independently so results remain
+usable in small windows. Press **Enter** in a query key field or **Ctrl+Enter**
+within the explorer to run a query. Scans still require explicit confirmation.
+Panel visibility and widths are retained during the session. Drag the divider
+between result keys and JSON to resize them; long result keys wrap, show their
+full value on hover, and have individual copy buttons. The results heading
+identifies the executed query separately from the editable draft above it.
+
 History records successful queries and up to 50 returned primary keys per execution.
 Use **Save snapshot** to keep an item's historical JSON; **Restore query** fills
 the form on your current connection without running it.
@@ -29,6 +39,12 @@ For a release binary, use `cargo build --release` and run
 `./target/release/ddb-explorer` from your terminal.
 Without Nix, install the dependencies listed in `shell.nix` and a Rust
 toolchain supporting edition 2024. On NixOS, enable `hardware.graphics.enable`.
+
+With direnv installed and its shell hook enabled, run `direnv allow` once in
+the repository. The checked-in `.envrc` loads `shell.nix` whenever you enter the
+project, so `cargo run` works directly in your usual shell. This preserves zsh
+configuration and the Starship prompt; there is no need to enter a nested
+`nix-shell`. Run `direnv allow` again after reviewing changes to `.envrc`.
 
 ## Local DynamoDB
 

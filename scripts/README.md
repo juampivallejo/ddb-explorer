@@ -42,8 +42,12 @@ It retries unprocessed batch writes. The fixtures include:
   text. `book-6` and `book-7` each display 100 lines of formatted JSON in the item
   viewer; `book-8` displays 1,000 lines, using lists of excerpts to exercise
   scrolling through large items.
-- `Events`: 40 items with partition key `pk`, sort key `sk`, and the
-  `ByEventType` global secondary index.
+- `Events`: 160 items with partition key `pk`, sort key `sk`, and the
+  `ByEventType` global secondary index. The original 40 events are joined by
+  120 UX events: 115 share `pk = UX#PAGINATION`, and all 120 share
+  `eventType = UX_TEST`. The last 20 have long sort keys, with the last 5 also
+  having long partition keys. These exercise three 50-item pages, wrapping,
+  resizing, GSI conditions, and scrolling without changing existing table schemas.
 - `EmptyTable`: a table with no seeded items.
 - `SampleTable001` through `SampleTable097`: empty tables with string `id`
   primary keys, bringing the seeded total to 100 tables for sidebar browsing
@@ -81,3 +85,34 @@ docker compose up -d
 Use `docker compose logs dynamodb` to inspect startup failures. DynamoDB Local
 does not reproduce all cloud behavior or validate production IAM permissions.
 The explorer should expose read operations; fixture writes stay in these tools.
+
+## Explorer UX checks
+
+After `./scripts/seed`, select **Events** in the app:
+
+1. Query **Primary key** with `pk = UX#PAGINATION`, sort **Any**. Press Enter:
+   expect pages of 50, 50, and 15 items.
+2. Select **ByEventType**, set `eventType = UX_TEST`, and choose **Between**.
+   Use `2026-10-01T00:00:00Z` through `2026-10-01T01:59:59Z`: expect 120
+   items across three pages. Try **Begins with** `2026-10-01T01:` for 60 items.
+3. At 800 × 600, verify the settings scroll and the Run button stays visible.
+   Collapse settings with Ctrl+Shift+Q and hide the sidebar with Ctrl+B.
+   Reopen both and check that values, selection, widths, and scroll are retained.
+4. On the third GSI page, inspect long keys. Resize the key list using the
+   divider, hover a key for its full value, and copy it with its copy button.
+5. Leave a required field empty and submit: settings should expand and the
+   invalid field should receive focus. Ctrl+Enter in Scan mode must not confirm
+   a prepared scan.
+
+CLI equivalents (each call fetches one page):
+
+```sh
+./scripts/ddb query --table-name Events --limit 50 --no-paginate \
+  --key-condition-expression 'pk = :pk' \
+  --expression-attribute-values '{":pk":{"S":"UX#PAGINATION"}}'
+
+./scripts/ddb query --table-name Events --index-name ByEventType \
+  --limit 50 --no-paginate \
+  --key-condition-expression 'eventType = :type AND sk BETWEEN :start AND :end' \
+  --expression-attribute-values '{":type":{"S":"UX_TEST"},":start":{"S":"2026-10-01T00:00:00Z"},":end":{"S":"2026-10-01T01:59:59Z"}}'
+```
