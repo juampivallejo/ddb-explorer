@@ -14,6 +14,19 @@ use std::{
 pub const KEY_LIMIT: usize = 50;
 static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
+pub(super) fn primary_key(item: &Value, primary: &KeyTarget) -> Option<Value> {
+    let mut key = serde_json::Map::new();
+    key.insert(
+        primary.partition.name.clone(),
+        item.get(&primary.partition.name)?.clone(),
+    );
+    if let Some(sort) = &primary.sort {
+        key.insert(sort.name.clone(), item.get(&sort.name)?.clone());
+    }
+    key.sort_keys();
+    Some(Value::Object(key))
+}
+
 pub fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -114,19 +127,9 @@ impl Entry {
             if self.keys.len() == KEY_LIMIT {
                 break;
             }
-            let Some(partition) = item.get(&primary.partition.name) else {
-                continue;
-            };
-            let mut key = serde_json::Map::new();
-            key.insert(primary.partition.name.clone(), partition.clone());
-            if let Some(sort) = &primary.sort {
-                let Some(value) = item.get(&sort.name) else {
-                    continue;
-                };
-                key.insert(sort.name.clone(), value.clone());
+            if let Some(key) = primary_key(item, primary) {
+                self.keys.push(key);
             }
-            key.sort_keys();
-            self.keys.push(Value::Object(key));
         }
     }
 }

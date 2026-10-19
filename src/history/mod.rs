@@ -1,19 +1,75 @@
 mod models;
 mod store;
 
+use crate::ui::split::{SplitPane, SplitState};
 use crate::{
     browser::item_detail::ItemDetail,
-    dynamodb::Connection,
-    ui::{self, BORDER, ERROR, MUTED, PANEL, SELECTED},
+    dynamodb::{Connection, KeyTarget, SortOperator},
+    ui::{self, ACCENT, BORDER, ERROR, MUTED, PANEL, SELECTED},
 };
 use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::{
-    AppContext, Context, Entity, EventEmitter, IntoElement, Render, Subscription, Task, Window,
-    div, prelude::*, px, rgb, uniform_list,
+    AppContext, Context, Entity, EventEmitter, IntoElement, Render, Subscription, Task,
+    TestSupportExt, Window, div, prelude::*, px, rgb, uniform_list,
 };
 pub use models::{Entry, SavedQuery};
 use serde_json::Value;
 use store::{Command, HistoryStore, Reply};
+
+fn entry_kind_pill(snapshot: bool) -> gpui_kit::Div {
+    let (label, foreground, background, border) = if snapshot {
+        ("Saved snapshot", 0x9ee5c4, 0x1b3830, 0x345849)
+    } else {
+        ("Query", ACCENT, SELECTED, 0x48638b)
+    };
+    div()
+        .flex_shrink_0()
+        .px_2()
+        .py_0p5()
+        .rounded_full()
+        .border_1()
+        .border_color(rgb(border))
+        .bg(rgb(background))
+        .text_xs()
+        .line_height(px(16.))
+        .font_weight(gpui_kit::FontWeight::SEMIBOLD)
+        .text_color(rgb(foreground))
+        .child(label)
+}
+
+fn entry_key_lines(entry: &Entry) -> Vec<String> {
+    if entry.snapshot {
+        return entry.keys.first().and_then(Value::as_object).map_or_else(
+            || vec!["Key details unavailable for this older snapshot".into()],
+            |key| {
+                key.iter()
+                    .map(|(name, value)| {
+                        let value = value
+                            .as_str()
+                            .map(str::to_owned)
+                            .unwrap_or_else(|| value.to_string());
+                        format!("{name} = {value}")
+                    })
+                    .collect()
+            },
+        );
+    }
+    let Some(query) = &entry.query else {
+        return Vec::new();
+    };
+    let mut lines = vec![format!("{} = {}", query.partition_key, query.partition)];
+    if let Some(name) = &query.sort_key
+        && query.operator != SortOperator::Any
+    {
+        let mut condition = format!("{name} {} {}", query.operator.label(), query.sort);
+        if query.operator == SortOperator::Between {
+            condition.push_str(&format!(" and {}", query.end));
+        }
+        lines.push(condition);
+    }
+    lines
+}
 
 pub struct RestoreQuery {
     pub table: String,
@@ -21,6 +77,7 @@ pub struct RestoreQuery {
 }
 
 pub struct History {
+    panels: Entity<SplitState>,
     store: Option<HistoryStore>,
     entries: Vec<Entry>,
     selected: Option<String>,
@@ -79,6 +136,7 @@ impl History {
             }
         };
         let mut this = Self {
+            panels: cx.new(|_| SplitState::new(px(400.), px(260.), px(280.))),
             store,
             entries: Vec::new(),
             selected: None,
@@ -163,10 +221,13 @@ impl History {
         connection: Connection,
         table: String,
         item: Value,
+        primary: &KeyTarget,
         cx: &mut Context<Self>,
     ) {
         let mut entry = Entry::new(connection, table, None);
         entry.snapshot = true;
+        entry.keys.extend(models::primary_key(&item, primary));
+        entry.result_count = 1;
         self.command(
             Command::Save {
                 entry: Box::new(entry),
@@ -319,13 +380,14 @@ impl Render for History {
             .enumerate()
             .filter_map(|(index, entry)| {
                 let text = format!(
-                    "{} {} {}",
+                    "{} {} {} {}",
                     entry.table,
                     entry.connection,
                     entry
                         .query
                         .as_ref()
-                        .map_or("Saved item", |query| query.summary.as_str())
+                        .map_or("Saved snapshot", |query| query.summary.as_str()),
+                    entry_key_lines(entry).join(" ")
                 );
                 text.to_lowercase()
                     .contains(&self.filter_text)
@@ -344,36 +406,67 @@ impl Render for History {
                         let date = chrono::DateTime::from_timestamp_millis(entry.created_ms as i64)
                             .map(|date| date.format("%Y-%m-%d %H:%M UTC").to_string())
                             .unwrap_or_default();
+                        let mut metadata = format!("{date} · {}", entry.connection);
+                        if let Some(index) =
+                            entry.query.as_ref().and_then(|query| query.index.as_ref())
+                        {
+                            metadata.push_str(&format!(" · Index: {index}"));
+                        }
                         div()
                             .id(format!("history-{}", entry.id))
-                            .h(px(112.0))
+                            .test_support()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .h(px(128.0))
+                            .w_full()
+                            .min_w_0()
                             .p_3()
                             .border_b_1()
                             .border_color(rgb(BORDER))
                             .bg(rgb(if selected { SELECTED } else { PANEL }))
                             .cursor_pointer()
-                            .child(div().text_ellipsis().child(format!(
-                                "{} · {}",
-                                entry.table,
-                                if entry.snapshot {
-                                    "Saved item"
-                                } else {
-                                    "Query"
-                                }
-                            )))
-                            .child(div().text_sm().text_color(rgb(MUTED)).child(date))
                             .child(
                                 div()
-                                    .text_sm()
+                                    .flex()
+                                    .items_center()
+                                    .flex_shrink_0()
+                                    .gap_2()
+                                    .child(
+                                        div()
+                                            .flex_1()
+                                            .min_w_0()
+                                            .text_ellipsis()
+                                            .child(entry.table.clone()),
+                                    )
+                                    .child(entry_kind_pill(entry.snapshot)),
+                            )
+                            .child(
+                                div()
+                                    .id(format!("history-metadata-{}", entry.id))
+                                    .text_xs()
                                     .text_color(rgb(MUTED))
                                     .text_ellipsis()
-                                    .child(entry.connection.clone()),
+                                    .child(metadata.clone())
+                                    .tooltip(move |window, cx| {
+                                        Tooltip::new(metadata.clone()).build(window, cx)
+                                    }),
                             )
-                            .when_some(entry.query.as_ref(), |row, query| {
-                                row.child(
-                                    div().text_sm().text_ellipsis().child(query.summary.clone()),
-                                )
-                            })
+                            .children(entry_key_lines(&entry).into_iter().enumerate().map(
+                                |(line, text)| {
+                                    div()
+                                        .id(format!("history-key-{}-{line}", entry.id))
+                                        .test_support()
+                                        .min_w_0()
+                                        .text_sm()
+                                        .line_height(px(20.))
+                                        .text_ellipsis()
+                                        .child(text.clone())
+                                        .tooltip(move |window, cx| {
+                                            Tooltip::new(text.clone()).build(window, cx)
+                                        })
+                                },
+                            ))
                             .on_click(cx.listener(move |this, _, window, cx| {
                                 this.select(entry.clone(), window, cx)
                             }))
@@ -381,12 +474,10 @@ impl Render for History {
                     .collect()
             }),
         )
-        .w_80()
-        .flex_shrink_0()
-        .min_h_0()
-        .border_r_1()
-        .border_color(rgb(BORDER));
-        let mut detail = div().flex().flex_col().flex_1().min_w_0().min_h_0();
+        .size_full()
+        .min_w_0()
+        .min_h_0();
+        let mut detail = div().flex().flex_col().size_full().min_w_0().min_h_0();
         if let Some(entry) = self
             .entries
             .iter()
@@ -400,7 +491,13 @@ impl Render for History {
                 });
             }
             let id = entry.id.clone();
-            let mut actions = div().flex().gap_2().p_3();
+            let mut actions = div()
+                .flex()
+                .flex_wrap()
+                .items_center()
+                .gap_2()
+                .p_3()
+                .child(entry_kind_pill(entry.snapshot));
             if let Some(query) = entry.query {
                 actions = actions.child(
                     ui::choice("restore-query", "Restore query", false).on_click(cx.listener(
@@ -448,7 +545,12 @@ impl Render for History {
             .when(self.loading && self.entries.is_empty(), |view| {
                 view.child(div().p_3().text_color(rgb(MUTED)).child("Loading history…"))
             })
-            .child(div().flex().flex_1().min_h_0().child(list).child(detail))
+            .child(div().flex_1().min_h_0().child(SplitPane::new(
+                "history-panels",
+                &self.panels,
+                list,
+                detail,
+            )))
     }
 }
 
@@ -456,6 +558,117 @@ impl Render for History {
 mod tests {
     use super::*;
     use gpui_kit::{TestAppContext, VisualTestContext};
+
+    #[gpui_kit::test]
+    fn snapshot_keys_persist_offline_and_history_rows_resize(cx: &mut TestAppContext) {
+        use crate::dynamodb::KeyDefinition;
+        use aws_sdk_dynamodb::types::ScalarAttributeType;
+        use gpui_kit::test::TestWindowExt;
+
+        cx.background_executor.allow_parking();
+        cx.update(gpui_kit::init);
+        let directory = tempfile::tempdir().unwrap();
+        let store = HistoryStore::open_at(directory.path().to_owned()).unwrap();
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let (history, visual) =
+            cx.add_window_view(move |window, cx| History::with_store(Ok(store), window, cx));
+        let primary = KeyTarget {
+            index_name: None,
+            partition: KeyDefinition {
+                name: "accountId".into(),
+                kind: ScalarAttributeType::S,
+            },
+            sort: Some(KeyDefinition {
+                name: "createdAt".into(),
+                kind: ScalarAttributeType::N,
+            }),
+        };
+        let long_key = "tenant-organization-".repeat(30);
+        let payload = serde_json::json!({"accountId": long_key, "createdAt": 42, "gsi_pk": "secondary", "payload": "historical value"});
+        VisualTestContext::update(visual, |_, cx| {
+            history.update(cx, |history, cx| {
+                history.save_snapshot(
+                    Connection::Local,
+                    "Events".into(),
+                    payload.clone(),
+                    &primary,
+                    cx,
+                );
+                history.command(Command::List, cx);
+            });
+        });
+        let barrier =
+            visual.read(|cx| history.read(cx).store.as_ref().unwrap().send(Command::List));
+        runtime.block_on(barrier).unwrap().unwrap();
+        visual.run_until_parked();
+        let snapshot = visual.read(|cx| history.read(cx).entries[0].clone());
+        assert!(snapshot.snapshot);
+        assert_eq!(
+            snapshot.keys,
+            vec![serde_json::json!({"accountId": long_key, "createdAt": 42})]
+        );
+        assert_eq!(
+            entry_key_lines(&snapshot),
+            vec![
+                format!("accountId = {long_key}"),
+                "createdAt = 42".to_owned()
+            ]
+        );
+        let loaded = visual.read(|cx| {
+            history
+                .read(cx)
+                .store
+                .as_ref()
+                .unwrap()
+                .send(Command::Payload(snapshot.id.clone()))
+        });
+        let Reply::Payload(loaded) = runtime.block_on(loaded).unwrap().unwrap() else {
+            panic!("expected payload")
+        };
+        assert_eq!(loaded, payload);
+
+        let query = Entry::new(
+            Connection::Local,
+            "Events".into(),
+            Some(SavedQuery {
+                index: Some("ByEventType".into()),
+                partition_key: "eventType".into(),
+                partition: "UX_TEST".into(),
+                sort_key: Some("sk".into()),
+                operator: SortOperator::Between,
+                sort: "A".into(),
+                end: "Z".into(),
+                summary: "Query · ByEventType · eventType = UX_TEST · sk Between A and Z".into(),
+            }),
+        );
+        assert_eq!(
+            entry_key_lines(&query),
+            vec!["eventType = UX_TEST", "sk Between A and Z"]
+        );
+        VisualTestContext::update(visual, |window, cx| {
+            history.update(cx, |history, cx| {
+                history.entries.push(query.clone());
+                cx.notify();
+            });
+            window.render_frame(cx);
+            let row = window.find(format!("history-{}", snapshot.id)).bounds();
+            let key_id = format!("history-key-{}-0", snapshot.id);
+            let key = window.find(key_id.clone()).bounds();
+            let sort = window
+                .find(format!("history-key-{}-1", snapshot.id))
+                .bounds();
+            assert!(key.bottom() <= sort.top());
+            assert!(sort.bottom() <= row.bottom());
+            assert!(key.right() <= row.right());
+            assert!(window.find(format!("history-key-{}-1", query.id)).visible());
+            let width = history.read(cx).panels.read(cx).width();
+            let divider = window.find("split-divider").bounds().center();
+            window.drag(divider, gpui_kit::point(divider.x + px(80.), divider.y), cx);
+            window.render_frame(cx);
+            assert_eq!(history.read(cx).panels.read(cx).width(), width + px(80.));
+            assert!(window.find(key_id).bounds().size.width > key.size.width);
+        });
+    }
 
     #[gpui_kit::test]
     fn failed_save_stays_visible_after_newer_refresh_and_successful_save(cx: &mut TestAppContext) {

@@ -114,8 +114,16 @@ impl ItemBrowser {
                         };
                         let table = displayed.request.table.clone();
                         let connection = this.connection;
+                        let Some(primary) = this.state.schema.schema().and_then(|schema| {
+                            schema
+                                .targets
+                                .iter()
+                                .find(|target| target.index_name.is_none())
+                        }) else {
+                            return;
+                        };
                         this.history.update(cx, |history, cx| {
-                            history.save_snapshot(connection, table, item, cx)
+                            history.save_snapshot(connection, table, item, primary, cx)
                         });
                         this.notice =
                             Some("Snapshot queued for saving. Open History to view it.".into());
