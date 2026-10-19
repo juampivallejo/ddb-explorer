@@ -10,12 +10,13 @@ use crate::{
     history::{Entry, History, SavedQuery},
     ui,
 };
+use gpui_kit::component::{input::InputEvent, scroll::Scrollbar};
 use gpui_kit::{
-    AppContext, Context, Entity, IntoElement, ListAlignment, ListState, Render, Task, Window, div,
-    prelude::*,
+    AppContext, Context, Entity, FocusHandle, IntoElement, ListAlignment, ListState, Render,
+    ScrollHandle, Subscription, Task, Window, div, prelude::*,
 };
 use item_detail::ItemDetail;
-use query::ReadMode;
+use query::{QueryValidation, ReadMode};
 use query_form::QueryInputs;
 use state::{BrowserState, PendingRead};
 use std::{cell::Cell, rc::Rc, time::Duration};
@@ -24,11 +25,17 @@ const PAGE_SIZE: i32 = 50;
 const LOADING_INDICATOR_DELAY: Duration = Duration::from_millis(150);
 
 pub struct ItemBrowser {
+    focus: FocusHandle,
+    settings_focus: FocusHandle,
+    settings_expanded: bool,
+    settings_scroll: ScrollHandle,
+    status_scroll: ScrollHandle,
     results_list: ListState,
     results_width: Rc<Cell<gpui_kit::Pixels>>,
     #[cfg(test)]
     rendered_rows: Cell<usize>,
     result_panels: Entity<SplitState>,
+    _input_subscriptions: Vec<Subscription>,
     service: DynamoDbService,
     connection: Connection,
     state: BrowserState,
@@ -52,7 +59,28 @@ impl ItemBrowser {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        let settings_scroll = ScrollHandle::new();
+        let inputs = QueryInputs::new(&settings_scroll, window, cx);
+        let input_subscriptions = [
+            &inputs.partition_input,
+            &inputs.sort_input,
+            &inputs.end_input,
+        ]
+        .into_iter()
+        .map(|input| {
+            cx.subscribe_in(input, window, |this, _, event, window, cx| match event {
+                InputEvent::PressEnter { shift: false, .. } => this.run_query(window, cx),
+                InputEvent::Change => cx.notify(),
+                _ => {}
+            })
+        })
+        .collect();
         Self {
+            focus: cx.focus_handle(),
+            settings_focus: cx.focus_handle(),
+            settings_expanded: true,
+            settings_scroll,
+            status_scroll: ScrollHandle::new(),
             results_list: ListState::new(0, ListAlignment::Top, gpui_kit::px(100.))
                 .with_uniform_item_height(gpui_kit::px(80.)),
             results_width: Rc::new(Cell::new(gpui_kit::px(0.))),
@@ -61,11 +89,12 @@ impl ItemBrowser {
             result_panels: cx.new(|_| {
                 SplitState::new(gpui_kit::px(280.), gpui_kit::px(160.), gpui_kit::px(160.))
             }),
+            _input_subscriptions: input_subscriptions,
             service,
             connection: Connection::Local,
             state: BrowserState::default(),
             mode: ReadMode::default(),
-            inputs: QueryInputs::new(window, cx),
+            inputs,
             detail: cx.new(|cx| ItemDetail::new(window, cx)),
             validation: None,
             notice: None,
@@ -160,6 +189,7 @@ impl ItemBrowser {
         cx: &mut Context<Self>,
     ) {
         self.open(connection, table, window, cx);
+        self.settings_expanded = true;
         self.mode = ReadMode::Query;
         self.restore = Some(query);
     }
@@ -211,14 +241,53 @@ impl ItemBrowser {
         })
     }
 
-    fn query_request(&self, cx: &Context<Self>) -> Result<ReadRequest, String> {
-        let table = self.state.schema.table().ok_or("Select a table first.")?;
+    fn query_request(&self, cx: &Context<Self>) -> Result<ReadRequest, QueryValidation> {
+        let table = self
+            .state
+            .schema
+            .table()
+            .ok_or_else(|| QueryValidation::general("Select a table first."))?;
         let schema = self
             .state
             .schema
             .schema()
-            .ok_or("Wait for the table keys to load.")?;
+            .ok_or_else(|| QueryValidation::general("Wait for the table keys to load."))?;
         self.inputs.draft(cx).validate(table, schema, PAGE_SIZE)
+    }
+
+    pub fn toggle_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.state.schema.table().is_none() {
+            return;
+        }
+        if self.settings_expanded && self.settings_focus.contains_focused(window, cx) {
+            self.focus.focus(window, cx);
+        }
+        self.settings_expanded = !self.settings_expanded;
+        cx.notify();
+    }
+
+    pub fn run_query(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.mode != ReadMode::Query
+            || self.state.reads.is_loading()
+            || self.state.schema.schema().is_none()
+        {
+            return;
+        }
+        match self.query_request(cx) {
+            Ok(request) => {
+                if let Some(pending) = self.state.reads.query(request) {
+                    self.submit(pending, window, cx);
+                }
+            }
+            Err(error) => {
+                self.settings_expanded = true;
+                if let Some(field) = error.field {
+                    self.inputs.focus_field(field, window, cx);
+                }
+                self.validation = Some(error.message);
+                cx.notify();
+            }
+        }
     }
 
     fn submit(&mut self, pending: PendingRead, window: &mut Window, cx: &mut Context<Self>) {
@@ -319,15 +388,47 @@ impl Render for ItemBrowser {
             .flex_col()
             .size_full()
             .min_h_0()
+            .track_focus(&self.focus)
+            .key_context("DdbExplorer")
+            .on_action(
+                cx.listener(|this, _: &ui::actions::RunQuery, window, cx| {
+                    this.run_query(window, cx)
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &ui::actions::ToggleQuerySettings, window, cx| {
+                    this.toggle_settings(window, cx)
+                }),
+            )
+            .child(self.query_toolbar(cx))
+            .when(self.settings_expanded, |view| {
+                view.child(
+                    div()
+                        .id("read-controls")
+                        .min_h_0()
+                        .max_h(gpui_kit::relative(0.45))
+                        .track_focus(&self.settings_focus)
+                        .track_scroll(&self.settings_scroll)
+                        .overflow_y_scroll()
+                        .child(self.controls(cx)),
+                )
+            })
             .child(
                 div()
-                    .id("read-controls")
-                    .max_h(gpui_kit::relative(0.6))
+                    .id("read-status")
+                    .min_h_0()
+                    .max_h(gpui_kit::relative(0.25))
+                    .track_scroll(&self.status_scroll)
                     .overflow_y_scroll()
-                    .child(self.controls(cx)),
+                    .child(self.status_controls(cx)),
             )
             .child(self.results(window, cx))
+            .when(self.settings_expanded, |view| {
+                view.child(Scrollbar::vertical(&self.settings_scroll).id("query-scrollbar"))
+            })
+            .child(Scrollbar::vertical(&self.status_scroll).id("status-scrollbar"))
     }
 }
+
 #[cfg(test)]
 mod tests;

@@ -17,6 +17,7 @@ fn main() {
         .run(|cx: &mut App| {
             gpui_kit::init(cx);
             ui::init_theme(cx);
+            ui::actions::init(cx);
             let service = dynamodb::DynamoDbService::new().expect("failed to start AWS runtime");
             gpui_kit::open_window(
                 WindowOptions {

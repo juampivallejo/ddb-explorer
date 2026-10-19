@@ -1,4 +1,5 @@
 //! Small shared view components and colors.
+pub mod actions;
 pub mod split;
 
 use gpui_kit::component::{Theme, ThemeMode};

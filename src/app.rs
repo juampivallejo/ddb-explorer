@@ -1,9 +1,9 @@
 mod table_sidebar;
 
+use crate::ui::split::{SplitPane, SplitState};
 use gpui_kit::component::input::{InputEvent, InputState};
-use gpui_kit::component::resizable::{h_resizable, resizable_panel};
 use gpui_kit::{
-    AppContext, Context, Div, Entity, IntoElement, Render, Subscription, Task,
+    AppContext, Context, Div, Entity, FocusHandle, IntoElement, Render, Subscription, Task,
     UniformListScrollHandle, Window, div, prelude::*, px, rgb,
 };
 use table_sidebar::VisibleTable;
@@ -17,6 +17,10 @@ use crate::{
 };
 
 pub struct Explorer {
+    focus: FocusHandle,
+    sidebar_focus: FocusHandle,
+    sidebar_visible: bool,
+    panels: Entity<SplitState>,
     service: DynamoDbService,
     connection: Connection,
     browser: Entity<ItemBrowser>,
@@ -65,7 +69,8 @@ impl Explorer {
                 cx.notify();
             },
         );
-        let table_filter = cx.new(|cx| InputState::new(window, cx).placeholder("Filter tables…"));
+        let table_filter =
+            cx.new(|cx| InputState::new(window, cx).placeholder("Filter tables… (Ctrl+L)"));
         let filter_subscription = cx.subscribe(&table_filter, |this, input, event, cx| {
             if matches!(event, InputEvent::Change) {
                 this.filter_text = input.read(cx).value().to_string();
@@ -78,6 +83,10 @@ impl Explorer {
             Err(error) => (None, Preferences::default(), Some(error)),
         };
         let mut explorer = Self {
+            focus: cx.focus_handle(),
+            sidebar_focus: cx.focus_handle(),
+            sidebar_visible: true,
+            panels: cx.new(|_| SplitState::new(px(320.), px(280.), px(320.))),
             connection: Connection::Local,
             browser: cx.new(|cx| ItemBrowser::new(service.clone(), history.clone(), window, cx)),
             service,
@@ -103,6 +112,7 @@ impl Explorer {
             _history_subscription: history_subscription,
             _history_observer: history_observer,
         };
+        explorer.focus.focus(window, cx);
         explorer.refresh_tables(window, cx);
         explorer
     }
@@ -187,32 +197,51 @@ impl Explorer {
             )
     }
 
+    fn toggle_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.sidebar_visible && self.sidebar_focus.contains_focused(window, cx) {
+            self.focus.focus(window, cx);
+        }
+        self.sidebar_visible = !self.sidebar_visible;
+        cx.notify();
+    }
+
+    fn focus_table_filter(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.history_visible = false;
+        self.sidebar_visible = true;
+        self.table_filter
+            .update(cx, |input, cx| input.focus(window, cx));
+        cx.notify();
+    }
+
     fn workspace(&self, _cx: &mut Context<Self>) -> Div {
         div()
             .flex()
             .flex_col()
-            .flex_1()
+            .size_full()
             .min_w_0()
+            .min_h_0()
             .child(
                 div()
                     .flex()
-                    .flex_col()
-                    .gap_2()
-                    .p_6()
+                    .items_center()
+                    .gap_3()
+                    .px_4()
+                    .py_2()
+                    .flex_shrink_0()
                     .border_b_1()
                     .border_color(rgb(BORDER))
                     .child(
-                        div().text_xl().child(
+                        div().flex_1().min_w_0().text_ellipsis().child(
                             self.selected_table
                                 .clone()
-                                .unwrap_or_else(|| self.connection.label().to_owned()),
+                                .unwrap_or_else(|| "Select a table".into()),
                         ),
                     )
                     .child(
                         div()
                             .text_sm()
                             .text_color(rgb(MUTED))
-                            .child(self.connection.description()),
+                            .child(self.connection.label()),
                     ),
             )
             .child(div().flex_1().min_h_0().child(self.browser.clone()))
@@ -225,6 +254,32 @@ impl Render for Explorer {
             .flex()
             .flex_col()
             .size_full()
+            .key_context("DdbExplorer")
+            .track_focus(&self.focus)
+            .on_action(
+                cx.listener(|this, _: &ui::actions::ToggleSidebar, window, cx| {
+                    this.toggle_sidebar(window, cx);
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &ui::actions::FocusTableFilter, window, cx| {
+                    this.focus_table_filter(window, cx);
+                }),
+            )
+            .on_action(cx.listener(|this, _: &ui::actions::RunQuery, window, cx| {
+                if !this.history_visible {
+                    this.browser
+                        .update(cx, |browser, cx| browser.run_query(window, cx));
+                }
+            }))
+            .on_action(
+                cx.listener(|this, _: &ui::actions::ToggleQuerySettings, window, cx| {
+                    if !this.history_visible {
+                        this.browser
+                            .update(cx, |browser, cx| browser.toggle_settings(window, cx));
+                    }
+                }),
+            )
             .bg(rgb(BACKGROUND))
             .text_color(rgb(TEXT))
             .child(
@@ -232,8 +287,8 @@ impl Render for Explorer {
                     .flex()
                     .items_center()
                     .justify_between()
-                    .px_6()
-                    .py_4()
+                    .px_4()
+                    .py_2()
                     .border_b_1()
                     .border_color(rgb(BORDER))
                     .child(
@@ -241,6 +296,20 @@ impl Render for Explorer {
                             .flex()
                             .items_center()
                             .gap_3()
+                            .child(
+                                ui::toolbar_button(
+                                    "toggle-sidebar",
+                                    if self.sidebar_visible {
+                                        "Hide sidebar"
+                                    } else {
+                                        "Show sidebar"
+                                    },
+                                )
+                                .tooltip("Toggle sidebar · Ctrl+B")
+                                .on_click(cx.listener(
+                                    |this, _, window, cx| this.toggle_sidebar(window, cx),
+                                )),
+                            )
                             .child(div().text_lg().child("DynamoDB Explorer"))
                             .child(
                                 ui::choice("explorer-tab", "Explorer", !self.history_visible)
@@ -274,21 +343,19 @@ impl Render for Explorer {
                     .flex()
                     .flex_1()
                     .min_h_0()
-                    .when(!self.history_visible, |view| {
-                        view.child(
-                            h_resizable("explorer-panels")
-                                .child(
-                                    resizable_panel()
-                                        .size(px(320.))
-                                        .size_range(px(280.)..gpui_kit::Pixels::MAX)
-                                        .child(self.sidebar(cx)),
-                                )
-                                .child(
-                                    resizable_panel()
-                                        .size_range(px(320.)..gpui_kit::Pixels::MAX)
-                                        .child(self.workspace(cx)),
-                                ),
-                        )
+                    .when(!self.history_visible && self.sidebar_visible, |view| {
+                        view.child(SplitPane::new(
+                            "explorer-panels",
+                            &self.panels,
+                            div()
+                                .size_full()
+                                .track_focus(&self.sidebar_focus)
+                                .child(self.sidebar(cx)),
+                            self.workspace(cx),
+                        ))
+                    })
+                    .when(!self.history_visible && !self.sidebar_visible, |view| {
+                        view.child(self.workspace(cx))
                     })
                     .when(self.history_visible, |view| {
                         view.child(self.history.clone())

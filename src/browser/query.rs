@@ -25,6 +25,34 @@ impl ReadMode {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum QueryField {
+    Partition,
+    Sort,
+    End,
+}
+
+#[derive(Debug)]
+pub(super) struct QueryValidation {
+    pub field: Option<QueryField>,
+    pub message: String,
+}
+
+impl QueryValidation {
+    pub fn general(message: impl Into<String>) -> Self {
+        Self {
+            field: None,
+            message: message.into(),
+        }
+    }
+    fn at(field: QueryField, message: impl Into<String>) -> Self {
+        Self {
+            field: Some(field),
+            message: message.into(),
+        }
+    }
+}
+
 pub(super) struct QueryDraft {
     pub target: usize,
     pub partition: String,
@@ -39,25 +67,36 @@ impl QueryDraft {
         table: &str,
         schema: &TableSchema,
         limit: i32,
-    ) -> Result<ReadRequest, String> {
+    ) -> Result<ReadRequest, QueryValidation> {
         let target = schema
             .targets
             .get(self.target)
-            .ok_or("Select a key or index first.")?;
-        let partition = target.partition.parse(&self.partition)?;
+            .ok_or_else(|| QueryValidation::general("Select a key or index first."))?;
+        let partition = target
+            .partition
+            .parse(&self.partition)
+            .map_err(|message| QueryValidation::at(QueryField::Partition, message))?;
         let sort = if self.sort_operator == SortOperator::Any {
             None
         } else {
-            let key = target.sort.as_ref().ok_or("This key has no sort key.")?;
+            let key = target.sort.as_ref().ok_or_else(|| {
+                QueryValidation::at(QueryField::Sort, "This key has no sort key.")
+            })?;
             if self.sort_operator == SortOperator::BeginsWith && key.kind == ScalarAttributeType::N
             {
-                return Err(
-                    "Begins with is available for string and binary sort keys only.".into(),
-                );
+                return Err(QueryValidation::at(
+                    QueryField::Sort,
+                    "Begins with is available for string and binary sort keys only.",
+                ));
             }
-            let value = key.parse(&self.sort)?;
+            let value = key
+                .parse(&self.sort)
+                .map_err(|message| QueryValidation::at(QueryField::Sort, message))?;
             let end = if self.sort_operator == SortOperator::Between {
-                Some(key.parse(&self.end)?)
+                let end = key
+                    .parse(&self.end)
+                    .map_err(|message| QueryValidation::at(QueryField::End, message))?;
+                Some(end)
             } else {
                 None
             };
@@ -147,6 +186,19 @@ mod tests {
         };
         assert_eq!(start, AttributeValue::N("10".into()));
         assert_eq!(end, AttributeValue::N("20.5".into()));
+        // Pass the entered bounds through; DynamoDB owns range semantics.
+        draft.sort = "20.5".into();
+        draft.end = "10".into();
+        let reversed = draft.validate("Events", &schema(), 50).unwrap();
+        let ReadOperation::Query {
+            sort: Some((SortOperator::Between, start, Some(end))),
+            ..
+        } = reversed.operation
+        else {
+            panic!("expected between condition")
+        };
+        assert_eq!(start, AttributeValue::N("20.5".into()));
+        assert_eq!(end, AttributeValue::N("10".into()));
         draft.sort_operator = SortOperator::BeginsWith;
         assert!(draft.validate("Events", &schema(), 50).is_err());
         draft.sort_operator = SortOperator::Equal;
