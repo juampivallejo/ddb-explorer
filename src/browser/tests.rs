@@ -382,7 +382,9 @@ fn scanned_long_pk_copies_and_pastes_exactly_across_input_focus_and_redraws(
         window.click("Query", cx);
         window.render_frame(cx);
         window.click("query-partition-input", cx);
+        window.set_modifiers(gpui_kit::Keystroke::parse("ctrl-v").unwrap().modifiers);
         window.press("ctrl-v", cx);
+        window.set_modifiers(Default::default());
         assert_eq!(
             browser
                 .read(cx)
@@ -395,7 +397,9 @@ fn scanned_long_pk_copies_and_pastes_exactly_across_input_focus_and_redraws(
         );
         for _ in 0..4 {
             window.press("ctrl-a", cx);
+            window.set_modifiers(gpui_kit::Keystroke::parse("ctrl-v").unwrap().modifiers);
             window.press("ctrl-v", cx);
+            window.set_modifiers(Default::default());
             window.render_frame(cx);
             assert_eq!(
                 browser
@@ -437,4 +441,72 @@ fn scanned_long_pk_copies_and_pastes_exactly_across_input_focus_and_redraws(
         })
         .unwrap();
     }
+}
+
+#[gpui_kit::test]
+fn paste_repeats_stop_when_the_shortcut_modifier_is_released(cx: &mut TestAppContext) {
+    use gpui_kit::{
+        ClipboardItem, KeyDownEvent, Keystroke, Modifiers, ModifiersChangedEvent, PlatformInput,
+    };
+    let (handle, browser) = browser(cx);
+    cx.update_window(handle.into(), |_, window, cx| {
+        let input = browser.read(cx).inputs.partition_input.clone();
+        input.update(cx, |input, cx| input.focus(window, cx));
+        window.render_frame(cx);
+        cx.write_to_clipboard(ClipboardItem::new_string("UX#PAGINATION".into()));
+        let key = Keystroke::parse("ctrl-v").unwrap();
+        window.dispatch_event(
+            PlatformInput::ModifiersChanged(ModifiersChangedEvent {
+                modifiers: key.modifiers,
+                capslock: Default::default(),
+            }),
+            cx,
+        );
+        window.dispatch_event(
+            PlatformInput::KeyDown(KeyDownEvent {
+                keystroke: key.clone(),
+                is_held: false,
+                prefer_character_input: false,
+            }),
+            cx,
+        );
+        assert_eq!(input.read(cx).value(), "UX#PAGINATION");
+        window.dispatch_event(
+            PlatformInput::ModifiersChanged(ModifiersChangedEvent {
+                modifiers: Modifiers::default(),
+                capslock: Default::default(),
+            }),
+            cx,
+        );
+        // Wayland's repeat timer retains the original shortcut modifiers.
+        // Simulate a missed key release followed by modifier release.
+        for _ in 0..3 {
+            window.dispatch_event(
+                PlatformInput::KeyDown(KeyDownEvent {
+                    keystroke: key.clone(),
+                    is_held: true,
+                    prefer_character_input: false,
+                }),
+                cx,
+            );
+        }
+        assert_eq!(input.read(cx).value(), "UX#PAGINATION");
+        window.dispatch_event(
+            PlatformInput::ModifiersChanged(ModifiersChangedEvent {
+                modifiers: key.modifiers,
+                capslock: Default::default(),
+            }),
+            cx,
+        );
+        window.dispatch_event(
+            PlatformInput::KeyDown(KeyDownEvent {
+                keystroke: key.clone(),
+                is_held: false,
+                prefer_character_input: false,
+            }),
+            cx,
+        );
+        assert_eq!(input.read(cx).value(), "UX#PAGINATIONUX#PAGINATION");
+    })
+    .unwrap();
 }
