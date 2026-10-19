@@ -1,4 +1,5 @@
 //! Small shared view components and colors.
+pub mod split;
 
 use gpui_kit::component::{Theme, ThemeMode};
 use gpui_kit::{App, Div, Stateful, div, prelude::*, rgb, rgba};
@@ -60,4 +61,13 @@ pub fn empty_state(title: &'static str, message: &'static str) -> Div {
         .p_6()
         .child(div().text_lg().child(title))
         .child(div().text_sm().text_color(rgb(MUTED)).child(message))
+}
+
+/// Focusable, keyboard-activatable controls for workspace toolbars.
+pub fn toolbar_button(
+    id: &'static str,
+    label: impl Into<gpui_kit::SharedString>,
+) -> gpui_kit::component::button::Button {
+    use gpui_kit::component::{Sizable, button::Button};
+    Button::new(id).small().outline().label(label)
 }

@@ -4,22 +4,31 @@ mod query_form;
 mod results;
 mod state;
 
+use crate::ui::split::SplitState;
 use crate::{
     dynamodb::{Connection, DynamoDbService, KeyTarget, LoadError, ReadOperation, ReadRequest},
     history::{Entry, History, SavedQuery},
     ui,
 };
-use gpui_kit::{AppContext, Context, Entity, IntoElement, Render, Task, Window, div, prelude::*};
+use gpui_kit::{
+    AppContext, Context, Entity, IntoElement, ListAlignment, ListState, Render, Task, Window, div,
+    prelude::*,
+};
 use item_detail::ItemDetail;
 use query::ReadMode;
 use query_form::QueryInputs;
 use state::{BrowserState, PendingRead};
-use std::time::Duration;
+use std::{cell::Cell, rc::Rc, time::Duration};
 
 const PAGE_SIZE: i32 = 50;
 const LOADING_INDICATOR_DELAY: Duration = Duration::from_millis(150);
 
 pub struct ItemBrowser {
+    results_list: ListState,
+    results_width: Rc<Cell<gpui_kit::Pixels>>,
+    #[cfg(test)]
+    rendered_rows: Cell<usize>,
+    result_panels: Entity<SplitState>,
     service: DynamoDbService,
     connection: Connection,
     state: BrowserState,
@@ -44,6 +53,14 @@ impl ItemBrowser {
         cx: &mut Context<Self>,
     ) -> Self {
         Self {
+            results_list: ListState::new(0, ListAlignment::Top, gpui_kit::px(100.))
+                .with_uniform_item_height(gpui_kit::px(80.)),
+            results_width: Rc::new(Cell::new(gpui_kit::px(0.))),
+            #[cfg(test)]
+            rendered_rows: Cell::new(0),
+            result_panels: cx.new(|_| {
+                SplitState::new(gpui_kit::px(280.), gpui_kit::px(160.), gpui_kit::px(160.))
+            }),
             service,
             connection: Connection::Local,
             state: BrowserState::default(),
@@ -66,6 +83,7 @@ impl ItemBrowser {
         self.read_task = None;
         self.detail.update(cx, |detail, cx| detail.clear(cx));
         self.state.reads.reset();
+        self.results_list.reset(0);
         self.validation = None;
         self.notice = None;
         cx.notify();
@@ -79,6 +97,7 @@ impl ItemBrowser {
         self.read_task = None;
         self.detail.update(cx, |detail, cx| detail.clear(cx));
         self.state.clear();
+        self.results_list.reset(0);
         self.inputs.reset(window, cx);
         self.validation = None;
         self.notice = None;
@@ -103,6 +122,7 @@ impl ItemBrowser {
         self.notice = None;
         self.connection = connection;
         let generation = self.state.open(table.clone());
+        self.results_list.reset(0);
         // Fast metadata responses never show a transient loading label.
         let timer = cx.background_executor().timer(LOADING_INDICATOR_DELAY);
         self.schema_indicator_task = Some(cx.spawn(async move |this, cx| {
@@ -201,7 +221,7 @@ impl ItemBrowser {
         self.inputs.draft(cx).validate(table, schema, PAGE_SIZE)
     }
 
-    fn submit(&mut self, pending: PendingRead, cx: &mut Context<Self>) {
+    fn submit(&mut self, pending: PendingRead, window: &mut Window, cx: &mut Context<Self>) {
         self.validation = None;
         self.notice = None;
         let id = pending.id;
@@ -209,11 +229,12 @@ impl ItemBrowser {
         let request = self
             .service
             .read_items(self.connection, pending.request, pending.start);
-        self.read_task = Some(cx.spawn(async move |this, cx| {
+        self.read_task = Some(cx.spawn_in(window, async move |this, cx| {
             let result = request.await;
-            let _ = this.update(cx, |this, cx| {
+            let _ = this.update_in(cx, |this, window, cx| {
                 if this.state.reads.finish(id, result) {
                     if this.state.reads.error().is_none() {
+                        this.sync_results(window, cx);
                         this.record_history(first_page, cx);
                     }
                     cx.notify();
@@ -221,6 +242,31 @@ impl ItemBrowser {
             });
         }));
         cx.notify();
+    }
+
+    fn sync_results(&self, window: &mut Window, cx: &mut Context<Self>) {
+        let count = self
+            .state
+            .reads
+            .displayed
+            .as_ref()
+            .map_or(0, |page| page.page.items.len());
+        self.results_list
+            .reset_with_uniform_height(count, gpui_kit::px(80.));
+        self.sync_selected_item(window, cx);
+    }
+
+    fn sync_selected_item(&self, window: &mut Window, cx: &mut Context<Self>) {
+        let selected = self.state.reads.displayed.as_ref().and_then(|page| {
+            page.selected_item.and_then(|index| {
+                page.page
+                    .items
+                    .get(index)
+                    .map(|item| ((page.id, index), item))
+            })
+        });
+        self.detail
+            .update(cx, |detail, cx| detail.set_item(selected, window, cx));
     }
 
     fn record_history(&mut self, first_page: bool, cx: &mut Context<Self>) {
@@ -283,3 +329,5 @@ impl Render for ItemBrowser {
             .child(self.results(window, cx))
     }
 }
+#[cfg(test)]
+mod tests;

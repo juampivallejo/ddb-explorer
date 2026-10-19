@@ -48,6 +48,15 @@ impl History {
         Self::with_store(HistoryStore::open(), window, cx)
     }
 
+    #[cfg(test)]
+    pub(crate) fn transient(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        Self::with_store(
+            Err(std::io::Error::other("Transient test history")),
+            window,
+            cx,
+        )
+    }
+
     fn with_store(
         store: std::io::Result<HistoryStore>,
         window: &mut Window,

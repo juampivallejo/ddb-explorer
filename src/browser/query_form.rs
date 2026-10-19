@@ -173,14 +173,14 @@ impl ItemBrowser {
                         .when(self.state.reads.is_loading(), |button| {
                             button.cursor_default().text_color(rgb(MUTED))
                         })
-                        .on_click(cx.listener(|this, _, _, cx| {
+                        .on_click(cx.listener(|this, _, window, cx| {
                             if this.state.reads.is_loading() {
                                 return;
                             }
                             match this.query_request(cx) {
                                 Ok(request) => {
                                     if let Some(pending) = this.state.reads.query(request) {
-                                        this.submit(pending, cx);
+                                        this.submit(pending, window, cx);
                                     }
                                 }
                                 Err(error) => {
@@ -213,8 +213,8 @@ impl ItemBrowser {
                 .child(format!("Scan {} / {}?", scan.request.table, scan.request.target.label()))
                 .child(div().text_sm().text_color(rgb(MUTED)).child("This reads one page of up to 50 items and can consume read capacity. Further pages require another confirmation."))
                 .child(div().flex().gap_2()
-                    .child(ui::choice("confirm-scan", "Confirm scan", true).on_click(cx.listener(|this, _, _, cx| {
-                        if let Some(pending) = this.state.reads.confirm_scan() { this.submit(pending, cx); }
+                    .child(ui::choice("confirm-scan", "Confirm scan", true).on_click(cx.listener(|this, _, window, cx| {
+                        if let Some(pending) = this.state.reads.confirm_scan() { this.submit(pending, window, cx); }
                     })))
                     .child(ui::choice("cancel-scan", "Cancel", false).on_click(cx.listener(|this, _, _, cx| { this.state.reads.cancel_scan(); cx.notify(); })))));
         }
