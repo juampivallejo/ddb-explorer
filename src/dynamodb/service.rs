@@ -264,6 +264,98 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "requires seeded DynamoDB Local UX fixtures"]
+    fn ux_gsi_range_paginates_and_preserves_long_keys() {
+        let service = DynamoDbService::new().unwrap();
+        service.inner.runtime.as_ref().unwrap().block_on(async {
+            let schema = service
+                .describe_table(Connection::Local, "Events".into())
+                .await
+                .unwrap();
+            let primary = schema
+                .targets
+                .iter()
+                .find(|target| target.index_name.is_none())
+                .unwrap()
+                .clone();
+            let target = schema
+                .targets
+                .into_iter()
+                .find(|target| target.index_name.as_deref() == Some("ByEventType"))
+                .unwrap();
+            let request = ReadRequest {
+                table: "Events".into(),
+                target,
+                operation: ReadOperation::Query {
+                    partition: AttributeValue::S("UX_TEST".into()),
+                    sort: Some((
+                        SortOperator::Between,
+                        AttributeValue::S("2026-10-01T00:00:00Z".into()),
+                        Some(AttributeValue::S("2026-10-01T01:59:59Z".into())),
+                    )),
+                },
+                limit: 50,
+            };
+            let mut start = None;
+            let mut items = Vec::new();
+            for expected in [50, 50, 20] {
+                let page = service
+                    .read_items(Connection::Local, request.clone(), start)
+                    .await
+                    .unwrap();
+                assert_eq!(page.items.len(), expected);
+                for item in &page.items {
+                    assert!(!items.contains(item));
+                }
+                items.extend(page.items);
+                start = page.next_key;
+            }
+            assert!(start.is_none());
+            assert_eq!(
+                items
+                    .iter()
+                    .filter(|item| item["sk"].as_str().unwrap().len() > 200)
+                    .count(),
+                20
+            );
+            assert_eq!(
+                items
+                    .iter()
+                    .filter(|item| item["pk"].as_str().unwrap().len() > 200)
+                    .count(),
+                5
+            );
+            let long_pk = items
+                .iter()
+                .find_map(|item| item["pk"].as_str().filter(|pk| pk.starts_with("UX#LONG#")))
+                .unwrap();
+            assert_eq!(long_pk.len(), 388);
+            let page = service
+                .read_items(
+                    Connection::Local,
+                    ReadRequest {
+                        table: "Events".into(),
+                        target: primary,
+                        operation: ReadOperation::Query {
+                            partition: AttributeValue::S(long_pk.to_owned()),
+                            sort: None,
+                        },
+                        limit: 50,
+                    },
+                    None,
+                )
+                .await
+                .unwrap();
+            assert_eq!(page.items.len(), 5);
+            assert!(
+                page.items
+                    .iter()
+                    .all(|item| item["pk"].as_str() == Some(long_pk))
+            );
+        });
+    }
+
+    #[test]
     #[ignore = "requires seeded DynamoDB Local"]
     fn scans_queries_and_pagination_work_locally() {
         let service = DynamoDbService::new().unwrap();
